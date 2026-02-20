@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  IconPlane,
+  IconSpeedboatFilled,
   IconTicket,
   IconRoute,
   IconUsers,
@@ -102,7 +102,7 @@ export default function DashboardPage() {
           <Card className="col-span-3">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <IconPlane className="h-5 w-5" />
+                <IconSpeedboatFilled className="h-5 w-5" />
                 Recent Bookings
               </CardTitle>
             </CardHeader>
@@ -145,14 +145,14 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <IconPlane className="h-5 w-5" />
+                <IconSpeedboatFilled className="h-5 w-5" />
                 Quick Actions
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex h-[200px] items-center justify-center rounded-md border border-dashed">
                 <div className="text-center">
-                  <IconPlane className="mx-auto h-10 w-10 text-muted-foreground/50" />
+                  <IconSpeedboatFilled className="mx-auto h-10 w-10 text-muted-foreground/50" />
                   <p className="mt-2 text-sm text-muted-foreground">
                     Quick action buttons placeholder
                   </p>

@@ -5,6 +5,7 @@ import {
   setAuthToken,
   setAuthUser,
   clearAuthCookies,
+  getAuthToken,
 } from "@/lib/auth-cookies";
 import {
   AYAHAY_API,
@@ -17,18 +18,35 @@ import type { LoginFormData } from "@/lib/validators/auth.validators";
 const taAuthApi = axios.create({
   baseURL: AYAHAY_API,
   timeout: API_TIMEOUT,
-  withCredentials: true, // Important for cookies!
+  withCredentials: true, // Sends httpOnly cookies (access_token set by server)
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Backend wraps all responses in this envelope
-interface ApiResponse<T> {
-  status: string;
-  message: string;
-  data: T;
-}
+// Inject stored Bearer token on every request so both auth paths work
+taAuthApi.interceptors.request.use((config) => {
+  const token = getAuthToken() ?? useAuthStore.getState().accessToken;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Auto-unwrap SuccessResponseInterceptor envelope: { status, message, data }
+taAuthApi.interceptors.response.use((response) => {
+  const body = response.data;
+  if (
+    body &&
+    typeof body === "object" &&
+    "status" in body &&
+    body.status === "success" &&
+    "data" in body
+  ) {
+    response.data = body.data;
+  }
+  return response;
+});
 
 // API Response types (matching backend)
 interface LoginResponse {
@@ -53,35 +71,36 @@ interface ProfileResponse {
 // Auth API endpoints
 const authApi = {
   login: async (data: LoginFormData): Promise<LoginResponse> => {
-    const response = await taAuthApi.post<ApiResponse<LoginResponse>>(
+    const response = await taAuthApi.post<LoginResponse>(
       TRAVEL_AGENCY_API.AUTH.LOGIN,
       {
         email: data.email,
         password: data.password,
       },
     );
-    return response.data.data;
+    return response.data;
   },
 
   logout: async (): Promise<{ message: string }> => {
-    const response = await taAuthApi.post<ApiResponse<{ message: string }>>(
+    const response = await taAuthApi.post<{ message: string }>(
       TRAVEL_AGENCY_API.AUTH.LOGOUT,
     );
-    return response.data.data;
+    return response.data;
   },
 
   getMe: async (): Promise<ProfileResponse> => {
-    const response = await taAuthApi.get<ApiResponse<ProfileResponse>>(
+    const response = await taAuthApi.get<ProfileResponse>(
       TRAVEL_AGENCY_API.AUTH.PROFILE,
     );
-    return response.data.data;
+    return response.data;
   },
 
   verifyToken: async (): Promise<{ valid: boolean; user: ProfileResponse }> => {
-    const response = await taAuthApi.get<
-      ApiResponse<{ valid: boolean; user: ProfileResponse }>
-    >(TRAVEL_AGENCY_API.AUTH.VERIFY_TOKEN);
-    return response.data.data;
+    const response = await taAuthApi.get<{
+      valid: boolean;
+      user: ProfileResponse;
+    }>(TRAVEL_AGENCY_API.AUTH.VERIFY_TOKEN);
+    return response.data;
   },
 };
 
@@ -104,18 +123,6 @@ function mapBackendUserToStoreUser(backendUser: LoginResponse["user"]): User {
   };
 }
 
-// Error helper
-function getErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const data = error.response?.data as { message?: string } | undefined;
-    return data?.message ?? error.message ?? "An unexpected error occurred";
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "An unexpected error occurred";
-}
-
 // Query keys
 export const authKeys = {
   all: ["auth"] as const,
@@ -130,23 +137,18 @@ export function useLogin() {
   return useMutation({
     mutationFn: authApi.login,
     onSuccess: (data) => {
-      // Add validation to ensure we have the required data
-      if (!data || !data.user) {
-        console.error("Login failed: Invalid response from server", data);
-        throw new Error("Invalid login response from server");
+      if (!data?.user || !data?.access_token) {
+        return; // Let the form handle missing data gracefully
       }
 
       const user = mapBackendUserToStoreUser(data.user);
-      // Note: Cookies are set by the backend automatically (httpOnly)
-      // We only store access_token in client state for axios headers
       setAuthToken(data.access_token);
       setAuthUser(user);
-      // Update Zustand store
       login(user, data.access_token);
       queryClient.setQueryData(authKeys.me(), user);
     },
-    onError: (error) => {
-      console.error("Login failed:", getErrorMessage(error));
+    onError: () => {
+      // Error is displayed in the form via loginMutation.error
     },
   });
 }
@@ -156,20 +158,16 @@ export function useLogout() {
   const queryClient = useQueryClient();
   const { logout } = useAuthStore();
 
+  const clearAndRedirect = () => {
+    clearAuthCookies();
+    logout();
+    queryClient.clear();
+    window.location.href = "/login";
+  };
+
   return useMutation({
     mutationFn: authApi.logout,
-    onSuccess: () => {
-      // Clear cookies
-      clearAuthCookies();
-      // Clear Zustand store
-      logout();
-      queryClient.clear();
-    },
-    onError: () => {
-      // Logout locally even if API call fails
-      clearAuthCookies();
-      logout();
-      queryClient.clear();
-    },
+    onSuccess: clearAndRedirect,
+    onError: clearAndRedirect, // Logout locally even if API call fails
   });
 }

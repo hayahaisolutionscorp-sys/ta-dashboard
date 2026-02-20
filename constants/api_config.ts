@@ -22,4 +22,17 @@ export const TRAVEL_AGENCY_API = {
     DELETE: (id: string) => `/travel-agencies/${id}`,
     CREATE: "/travel-agencies",
   },
+  TRIPS: {
+    AVAILABLE: "/travel-agencies/available-trips",
+  },
+  BOOKINGS: {
+    PREPARE: "/travel-agencies/bookings/prepare",
+    CREATE: "/travel-agencies/bookings",
+    FIND: "/travel-agencies/bookings",
+    GET: (id: string) => `/travel-agencies/bookings/${id}`,
+    PRICING: "/travel-agencies/bookings/pricing",
+  },
+  ROUTES: {
+    BY_AGENT: (agentId: number) => `/travel-agencies/agents/${agentId}/tenants`,
+  },
 };

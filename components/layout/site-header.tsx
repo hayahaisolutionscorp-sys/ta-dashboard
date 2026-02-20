@@ -14,13 +14,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { IconUser, IconSettings, IconLogout } from "@tabler/icons-react";
 import { useAuthStore } from "@/lib/stores/auth.store";
+import { useLogout } from "@/services/auth.service";
 
 export function SiteHeader() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const logoutMutation = useLogout();
 
   const handleLogout = () => {
-    logout();
-    window.location.href = "/login";
+    logoutMutation.mutate();
   };
 
   return (

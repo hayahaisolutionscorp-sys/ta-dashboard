@@ -24,7 +24,11 @@ export function getAuthToken(): string | undefined {
 
 // Remove auth token cookie
 export function removeAuthToken(): void {
-  deleteCookie(AUTH_TOKEN_KEY, { path: "/" });
+  deleteCookie(AUTH_TOKEN_KEY, {
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 }
 
 // Set user data cookie (for SSR access)
@@ -45,7 +49,11 @@ export function getAuthUser<T>(): T | undefined {
 
 // Remove user data cookie
 export function removeAuthUser(): void {
-  deleteCookie(AUTH_USER_KEY, { path: "/" });
+  deleteCookie(AUTH_USER_KEY, {
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 }
 
 // Clear all auth cookies

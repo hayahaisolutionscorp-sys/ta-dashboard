@@ -6,13 +6,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   IconDashboard,
-  IconPlane,
-  IconRoute,
   IconTicket,
-  IconUsers,
+  IconSpeedboatFilled,
   IconSettings,
   IconHelp,
   IconLogout,
+  IconZoomMoney,
 } from "@tabler/icons-react";
 
 import {
@@ -28,6 +27,7 @@ import {
   SidebarGroupContent,
 } from "@/components/ui/sidebar";
 import { useAuthStore } from "@/lib/stores/auth.store";
+import { useLogout } from "@/services/auth.service";
 
 const navItems = [
   {
@@ -38,22 +38,17 @@ const navItems = [
   {
     title: "Book Trip",
     url: "/dashboard/book",
-    icon: IconPlane,
+    icon: IconSpeedboatFilled,
   },
   {
-    title: "Routes",
-    url: "/dashboard/routes",
-    icon: IconRoute,
-  },
-  {
-    title: "Bookings",
+    title: "My Bookings",
     url: "/dashboard/bookings",
     icon: IconTicket,
   },
   {
-    title: "Passengers",
-    url: "/dashboard/passengers",
-    icon: IconUsers,
+    title: "Rates",
+    url: "/dashboard/rates",
+    icon: IconZoomMoney,
   },
 ];
 
@@ -72,11 +67,11 @@ const secondaryItems = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const logoutMutation = useLogout();
 
   const handleLogout = () => {
-    logout();
-    window.location.href = "/login";
+    logoutMutation.mutate();
   };
 
   return (

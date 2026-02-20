@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +23,21 @@ import {
 import { useLogin } from "@/services/auth.service";
 import { getErrorMessage } from "@/lib/api";
 
+// Map raw API error messages to user-friendly text
+function getFriendlyError(error: unknown): string {
+  const msg = getErrorMessage(error).toLowerCase();
+  if (
+    msg.includes("invalid credentials") ||
+    msg.includes("unauthorized") ||
+    msg.includes("invalid") ||
+    msg.includes("password") ||
+    msg.includes("not found")
+  ) {
+    return "Wrong email or password.";
+  }
+  return "Something went wrong. Please try again.";
+}
+
 export function LoginForm({
   className,
   ...props
@@ -37,6 +51,7 @@ export function LoginForm({
     register,
     handleSubmit,
     formState: { errors },
+    setError,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginFormSchema),
   });
@@ -46,6 +61,10 @@ export function LoginForm({
       onSuccess: () => {
         router.push("/dashboard");
         router.refresh();
+      },
+      onError: (error) => {
+        // Show inline form error instead of crashing Next.js
+        setError("root", { message: getFriendlyError(error) });
       },
     });
   };
@@ -71,9 +90,9 @@ export function LoginForm({
                   Travel Agent Portal
                 </span>
               </div>
-              {loginMutation.isError && (
+              {errors.root && (
                 <div className="text-destructive text-sm text-center bg-destructive/10 p-3 rounded-md">
-                  {getErrorMessage(loginMutation.error)}
+                  {errors.root.message}
                 </div>
               )}
               <div className="grid gap-5 py-2">
@@ -83,9 +102,15 @@ export function LoginForm({
                   </Label>
                   <Input
                     id="email"
-                    type="email"
+                    type="text"
+                    inputMode="email"
+                    autoComplete="email"
                     placeholder="your@email.com"
-                    className="h-11 border-primary/20 focus:border-primary focus:ring-primary/20"
+                    className={cn(
+                      "h-11 border-primary/20 focus:border-primary focus:ring-primary/20",
+                      errors.email &&
+                        "border-destructive focus:border-destructive",
+                    )}
                     disabled={isPending}
                     {...register("email")}
                   />
