@@ -41,17 +41,12 @@ api.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
-    // Only force-logout on 401s from auth endpoints, not from proxy/booking endpoints
+    // Redirect to login on any 401 — covers expired/invalid JWT tokens
     if (error.response?.status === 401) {
-      const url = error.config?.url ?? "";
-      const isAuthEndpoint =
-        url.includes("/travel-agencies-auth/") || url.includes("/auth/");
-      if (isAuthEndpoint) {
-        clearAuthCookies();
-        useAuthStore.getState().logout();
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
+      clearAuthCookies();
+      useAuthStore.getState().logout();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
       }
     }
     return Promise.reject(error);

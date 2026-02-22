@@ -12,19 +12,43 @@ export interface PageResult<T> {
 
 // ==================== Trip Types ====================
 
+export interface TripSegmentView {
+  id: string;
+  ship_id: number;
+  ship_name: string;
+  route_id: number;
+  source_port_code: string;
+  source_port_name: string;
+  destination_port_code: string;
+  destination_port_name: string;
+  scheduled_departure: string;
+  scheduled_arrival: string;
+  base_fare?: number | null;
+  currency?: string | null;
+}
+
 export interface TripView {
   id: string;
+  type: "direct" | "connecting";
+  segment_count: number;
+  origin_code: string;
+  origin_name: string;
+  destination_code: string;
+  destination_name: string;
+  total_departure_time: string;
+  total_arrival_time: string;
+  total_duration_minutes: number;
+  total_layover_minutes: number;
+  intermediate_ports: string[];
+  segments: TripSegmentView[];
+  // Legacy fields kept for backward compat
   route_id?: number;
   ship_id?: number;
-  departure_date: string;
+  departure_date?: string;
   departure_time?: string;
   arrival_time?: string;
   status?: string;
-  ship?: {
-    id: number;
-    name: string;
-    cabins: CabinView[];
-  };
+  ship?: { id: number; name: string; cabins: CabinView[] };
   route?: {
     id: number;
     src_port_code: string;
@@ -171,4 +195,87 @@ export interface AvailableTripsQuery {
 export interface AvailableTripsResult {
   total: number;
   data: TripView[];
+}
+
+// ==================== Available Dates Types ====================
+
+export interface AvailableDateItem {
+  date: string;
+  trip_count: number;
+}
+
+// ==================== Pricing Types ====================
+
+export interface PricingTripAssignment {
+  tripId: string;
+  cabinId?: number | null;
+  discountType?: string;
+}
+
+export interface PassengerPricingInput {
+  index: number;
+  passengerType: string;
+  tripAssignments: PricingTripAssignment[];
+}
+
+export interface CargoPricingInput {
+  index: number;
+  cargoType: "rolling" | "loose";
+  cargoClassCode?: string;
+  weight?: number;
+  quantity?: number;
+  volume?: number;
+  tripAssignments: PricingTripAssignment[];
+}
+
+export interface CalculatePricingRequest {
+  routeCode: string;
+  snapshotId?: number;
+  tripIds: string[];
+  passengers: PassengerPricingInput[];
+  cargos?: CargoPricingInput[];
+}
+
+export interface PassengerPriceDetail {
+  index: number;
+  tripId: string;
+  routeCode: string;
+  passengerType: string;
+  accommodationCode: string;
+  baseFare: number;
+  currency: string;
+}
+
+export interface CargoPriceDetail {
+  index: number;
+  tripId: string;
+  routeCode: string;
+  cargoType: "rolling" | "loose";
+  cargoClassCode: string;
+  baseFare: number;
+  currency: string;
+  rateUnit?: string;
+}
+
+export interface ChargeDetail {
+  ruleId: string;
+  chargeCode: string;
+  chargeName: string;
+  category: string;
+  amount: number;
+  isInclusive: boolean;
+  calcType: string;
+  basis: string;
+  showOnReceipt: boolean;
+}
+
+export interface CalculatePricingResponse {
+  passengerPrices: PassengerPriceDetail[];
+  cargoPrices: CargoPriceDetail[];
+  baseFare: { passengers: number; cargo: number; total: number };
+  charges: ChargeDetail[];
+  chargesTotal: number;
+  taxesTotal: number;
+  subtotal: number;
+  grandTotal: number;
 }

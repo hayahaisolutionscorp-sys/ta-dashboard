@@ -35,7 +35,12 @@ export default function CreateBookingPage() {
     error,
   } = useBookingData(searchParams);
 
-  const bookingData = bookingResponse?.data;
+  console.log("[CreateBookingPage] searchParams:", searchParams.toString());
+  console.log("[CreateBookingPage] bookingResponse:", bookingResponse);
+  console.log("[CreateBookingPage] isLoading:", isLoading, "error:", error);
+
+  const bookingData = bookingResponse;
+  console.log("[CreateBookingPage] bookingData:", bookingData);
 
   // 2-step flow: 1 = form, 2 = confirm
   const [step, setStep] = useState(1);
