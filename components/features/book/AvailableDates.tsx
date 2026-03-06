@@ -2,7 +2,7 @@
 
 import { IconCalendar } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { AvailableDateItem } from "@/lib/types/booking.types";
+import type { AvailableDateItem } from "@/constants/types/booking.types";
 
 interface AvailableDatesProps {
   dates: AvailableDateItem[];

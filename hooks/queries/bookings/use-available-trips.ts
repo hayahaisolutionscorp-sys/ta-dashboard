@@ -1,5 +1,5 @@
 import { bookingService } from "@/services/booking.service";
-import type { AvailableTripsQuery } from "@/lib/types/booking.types";
+import type { AvailableTripsQuery } from "@/constants/types/booking.types";
 import { useQuery } from "@tanstack/react-query";
 
 export function useAvailableTrips(

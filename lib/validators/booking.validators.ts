@@ -75,6 +75,7 @@ export const LooseCargoSchema = z.object({
   description: z.string().min(1, "Description is required"),
   weight: z.number().positive("Weight must be greater than 0").optional(),
   volume: z.number().positive().optional(),
+  declaredValue: z.number().nonnegative().optional(),
   packageType: z.string().optional(),
   quantity: z.number().positive("Quantity must be greater than 0"),
   cargoClassCode: z.string().optional(),

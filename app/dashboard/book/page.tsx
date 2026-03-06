@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useAvailableTrips } from "@/hooks/queries/bookings/use-available-trips";
 import { useAvailableDates } from "@/hooks/queries/bookings/use-available-dates";
 import { useRoutes } from "@/hooks/queries/bookings/use-routes";
-import type { AvailableTripsQuery } from "@/lib/types/booking.types";
+import type { AvailableTripsQuery } from "@/constants/types/booking.types";
 import TripResults from "@/components/features/book/TripResults";
 import AvailableDates from "@/components/features/book/AvailableDates";
 import { PortCombobox } from "@/components/features/book/PortCombobox";

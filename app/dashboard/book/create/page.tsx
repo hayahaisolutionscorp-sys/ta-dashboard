@@ -12,7 +12,10 @@ import {
   CreateBookingSchema,
   type BookingFormData,
 } from "@/lib/validators/booking.validators";
-import type { BookingRateSnapshot, TripView } from "@/lib/types/booking.types";
+import type {
+  TripSummary,
+  BookingFormTrip,
+} from "@/constants/types/booking.types";
 import PassengersSection from "@/components/features/book/sections/PassengersSection";
 import VehiclesSection from "@/components/features/book/sections/VehiclesSection";
 import LooseCargosSection from "@/components/features/book/sections/LooseCargosSection";
@@ -35,18 +38,13 @@ export default function CreateBookingPage() {
     error,
   } = useBookingData(searchParams);
 
-  console.log("[CreateBookingPage] searchParams:", searchParams.toString());
-  console.log("[CreateBookingPage] bookingResponse:", bookingResponse);
-  console.log("[CreateBookingPage] isLoading:", isLoading, "error:", error);
-
   const bookingData = bookingResponse;
-  console.log("[CreateBookingPage] bookingData:", bookingData);
 
   // 2-step flow: 1 = form, 2 = confirm
   const [step, setStep] = useState(1);
 
   // Flatten departure and return segments into trips array
-  const allTrips = useMemo(() => {
+  const allTrips: BookingFormTrip[] = useMemo(() => {
     if (!bookingData) return [];
     const departureSegments = Array.isArray(bookingData.departure)
       ? bookingData.departure
@@ -59,13 +57,13 @@ export default function CreateBookingPage() {
         ? [bookingData.return]
         : [];
     return [
-      ...departureSegments.map((trip: TripView, index: number) => ({
+      ...departureSegments.map((trip: TripSummary, index: number) => ({
         ...trip,
         tripType: "departure" as const,
         sequence: index + 1,
         cabins: trip.ship?.cabins ?? [],
       })),
-      ...returnSegments.map((trip: TripView, index: number) => ({
+      ...returnSegments.map((trip: TripSummary, index: number) => ({
         ...trip,
         tripType: "return" as const,
         sequence: index + 1,
@@ -74,55 +72,38 @@ export default function CreateBookingPage() {
     ];
   }, [bookingData]);
 
-  // Derive available options from rates
+  // Use options directly from the prepared booking data (client API provides these)
   const derivedOptions = useMemo(() => {
-    const rates = bookingData?.rates ?? [];
-    const discountTypesSet = new Set<string>();
-    const vehicleClassesSet = new Set<string>();
-    const cargoClassesSet = new Set<string>();
-    const validAccommodations = new Set<string>();
-
-    if (rates.length === 0) {
-      const FALLBACK = ["Adult", "Child", "Senior", "Student", "PWD", "Infant"];
-      for (const t of FALLBACK) {
-        discountTypesSet.add(t);
-      }
-    } else {
-      for (const snapshot of rates as BookingRateSnapshot[]) {
-        for (const r of snapshot.passenger_rates) {
-          discountTypesSet.add(r.passenger_type_code);
-          validAccommodations.add(r.accom_code);
-        }
-        for (const r of snapshot.cargo_rates) {
-          const type = r.cargo_type_code?.toUpperCase() || "";
-          if (type.includes("ROLLING")) {
-            vehicleClassesSet.add(r.cargo_class_code);
-          } else {
-            cargoClassesSet.add(r.cargo_class_code);
-          }
-        }
-      }
+    if (!bookingData) {
+      return {
+        discountTypes: ["Adult", "Child", "Senior", "Student", "PWD", "Infant"],
+        vehicleClasses: [] as string[],
+        cargoClasses: [] as string[],
+        validAccommodations: new Set<string>(),
+        availableCabinTypes: [] as string[],
+      };
     }
 
-    const discountTypes = Array.from(discountTypesSet).sort((a, b) => {
-      if (a.toLowerCase() === "adult") return -1;
-      if (b.toLowerCase() === "adult") return 1;
-      return a.localeCompare(b);
-    });
+    // Passenger types come directly from the API
+    const discountTypes =
+      bookingData.passengerTypes?.length > 0
+        ? bookingData.passengerTypes
+        : ["Adult", "Child", "Senior", "Student", "PWD", "Infant"];
 
-    // Derive available cabin types from ships
+    // Vehicle and cargo classes come directly from the API
+    const vehicleClasses = (bookingData.vehicleClasses ?? []).map(
+      (vc) => vc.code,
+    );
+    const cargoClasses = (bookingData.cargoClasses ?? []).map((cc) => cc.code);
+
+    // Accommodation codes from the API
+    const validAccommodations = new Set(bookingData.accommodationCodes ?? []);
+
+    // Derive cabin types from ship data in trips
     const shipCabinTypes = new Set<string>();
     const trips = [
-      ...(bookingData?.departure
-        ? Array.isArray(bookingData.departure)
-          ? bookingData.departure
-          : [bookingData.departure]
-        : []),
-      ...(bookingData?.return
-        ? Array.isArray(bookingData.return)
-          ? bookingData.return
-          : [bookingData.return]
-        : []),
+      ...(bookingData.departure ?? []),
+      ...(bookingData.return ?? []),
     ];
     for (const trip of trips) {
       for (const cabin of trip.ship?.cabins ?? []) {
@@ -144,8 +125,8 @@ export default function CreateBookingPage() {
 
     return {
       discountTypes,
-      vehicleClasses: Array.from(vehicleClassesSet).sort(),
-      cargoClasses: Array.from(cargoClassesSet).sort(),
+      vehicleClasses,
+      cargoClasses,
       validAccommodations,
       availableCabinTypes,
     };

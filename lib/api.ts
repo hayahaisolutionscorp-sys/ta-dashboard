@@ -29,14 +29,15 @@ api.interceptors.response.use(
   (response) => {
     // Auto-unwrap SuccessResponseInterceptor envelope: { status, message, data }
     const body = response.data;
-    if (
-      body &&
-      typeof body === "object" &&
-      "status" in body &&
-      body.status === "success" &&
-      "data" in body
-    ) {
-      response.data = body.data;
+    if (body && typeof body === "object" && "data" in body) {
+      // Unwrap { status: "success", data } (API V2 style)
+      // or { message: "...", data } (client API style)
+      if (
+        ("status" in body && body.status === "success") ||
+        "message" in body
+      ) {
+        response.data = body.data;
+      }
     }
     return response;
   },

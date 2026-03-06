@@ -1,11 +1,7 @@
 import { api } from "@/lib/api";
-import {
-  TRAVEL_AGENCY_API,
-  ROUTES_API,
-  TRIPS_API,
-} from "@/constants/api_config";
+import { useAuthStore } from "@/lib/stores/auth.store";
+import { TRAVEL_AGENCY_API, TRIPS_API } from "@/constants/api_config";
 import type {
-  SuccessResponse,
   PreparedBookingData,
   BookingView,
   PageResult,
@@ -16,9 +12,9 @@ import type {
   TripView,
   CalculatePricingRequest,
   CalculatePricingResponse,
-} from "@/lib/types/booking.types";
+} from "@/constants/types/booking.types";
 import type { BookingFormData } from "@/lib/validators/booking.validators";
-import { RouteEntity, TravelAgencyTenantWithNameEntity } from "@/constants";
+import { RouteEntity } from "@/constants";
 
 class BookingService {
   /**
@@ -34,17 +30,18 @@ class BookingService {
     params.set("page", String(query.page ?? 1));
     params.set("sort", query.sort ?? "departureDate");
 
-    const response = await api.get<{ message: string; data: TripView[] }[]>(
+    const response = await api.get<{ message: string; data: TripView[] }>(
       `${TRIPS_API.TRIP}?${params.toString()}`,
     );
-    console.log("[searchTrips] Response:", response);
 
-    // response.data is an array of per-tenant results: [{ message, data: [...trips] }]
-    const tenantResults = response.data;
-    const allTrips = tenantResults.flatMap((r) =>
-      Array.isArray(r?.data) ? r.data : [],
-    );
-    return { total: allTrips.length, data: allTrips };
+    // API V2 returns { message, data: [...trips] } (already unwrapped by axios interceptor)
+    const result = response.data;
+    const trips = Array.isArray(result)
+      ? (result as TripView[])
+      : Array.isArray(result?.data)
+        ? result.data
+        : [];
+    return { total: trips.length, data: trips };
   }
 
   /**
@@ -67,84 +64,14 @@ class BookingService {
   }
 
   async getRoutesForTa(agencyId: number): Promise<RouteEntity[]> {
-    console.log(
-      "[getRoutesForTa] Starting with agencyId:",
-      "agencyId:",
-      agencyId,
-    );
+    const res = await api.get(TRAVEL_AGENCY_API.ROUTES.BY_AGENCY(agencyId));
+    const routes: RouteEntity[] = res.data;
 
-    console.log(
-      "[getRoutesForTa] Trying BY_AGENCY endpoint:",
-      TRAVEL_AGENCY_API.ROUTES.BY_AGENCY(agencyId),
-    );
-    let response: RouteEntity[] | null = null;
-    try {
-      const res = await api.get(TRAVEL_AGENCY_API.ROUTES.BY_AGENCY(agencyId));
-      response = res.data;
-      console.log("[getRoutesForTa] BY_AGENCY response:", response);
-    } catch (err) {
-      console.warn("[getRoutesForTa] BY_AGENCY failed:", err);
-    }
-    if (response && Array.isArray(response) && response.length > 0) {
-      console.log(
-        "[getRoutesForTa] Returning",
-        response.length,
-        "routes from BY_AGENCY",
-      );
-      return response;
+    if (!Array.isArray(routes) || routes.length === 0) {
+      return [];
     }
 
-    console.log(
-      "[getRoutesForTa] Falling back to tenant lookup. FULL_INFO endpoint:",
-      TRAVEL_AGENCY_API.TENANTS.FULL_INFO(agencyId),
-    );
-    let tenant: TravelAgencyTenantWithNameEntity[] | null = null;
-    try {
-      const res = await api.get(TRAVEL_AGENCY_API.TENANTS.FULL_INFO(agencyId));
-      tenant = res.data;
-      console.log("[getRoutesForTa] Tenant response:", tenant);
-    } catch (err) {
-      console.warn("[getRoutesForTa] FULL_INFO failed:", err);
-    }
-
-    if (!tenant || tenant.length === 0) {
-      console.error(
-        "[getRoutesForTa] No tenants found for agencyId:",
-        agencyId,
-      );
-      throw new Error("No routes found for the travel agency");
-    }
-
-    const ids = tenant
-      .map((t) => t.tenant_id)
-      .filter((id): id is number => id !== null);
-    console.log(
-      "[getRoutesForTa] Tenant IDs:",
-      ids,
-      "→ ROUTES endpoint:",
-      ROUTES_API.AVAILABLE(ids),
-    );
-
-    let routes: RouteEntity[] | null = null;
-    try {
-      const res = await api.get(ROUTES_API.AVAILABLE(ids));
-      routes = res.data;
-      console.log("[getRoutesForTa] Routes from tenant IDs:", routes);
-    } catch (err) {
-      console.warn("[getRoutesForTa] ROUTES_API.AVAILABLE failed:", err);
-    }
-
-    if (routes && Array.isArray(routes) && routes.length > 0) {
-      console.log(
-        "[getRoutesForTa] Returning",
-        routes.length,
-        "routes from fallback",
-      );
-      return routes;
-    }
-
-    console.error("[getRoutesForTa] All attempts exhausted — no routes found");
-    throw new Error("No routes found for the travel agent");
+    return routes;
   }
 
   /**
@@ -158,10 +85,7 @@ class BookingService {
       typeof searchParams === "string" ? searchParams : searchParams.toString();
 
     const url = `${TRAVEL_AGENCY_API.BOOKINGS.PREPARE}?${queryString}`;
-    console.log("[prepareBooking] GET", url);
-
     const response = await api.get<PreparedBookingData>(url);
-    console.log("[prepareBooking] raw axios response.data:", response.data);
     return response.data;
   }
 
@@ -169,25 +93,29 @@ class BookingService {
    * Create a booking through the tenant's client API
    * The backend extracts travel_agency_id from the JWT token automatically.
    */
-  async createBooking(
-    bookingData: BookingFormData,
-  ): Promise<SuccessResponse<BookingView>> {
+  async createBooking(bookingData: BookingFormData): Promise<BookingView> {
     // Map form data for the API (same as TMS pattern)
     const payload: Record<string, unknown> = { ...bookingData };
 
-    // Map contact info to passengers
+    // Map contact info to passengers and strip fields not in the client API DTO
     if (Array.isArray(payload.passengers)) {
       payload.passengers = (
         payload.passengers as Record<string, unknown>[]
-      ).map((passenger) => ({
-        ...passenger,
-        address:
-          (passenger.address as string) || (payload.contactAddress as string),
-        mobileNumber:
-          (passenger.mobileNumber as string) ||
-          (payload.contactMobileNumber as string),
-        email: (passenger.email as string) || (payload.contactEmail as string),
-      }));
+      ).map((passenger) => {
+        const { occupation, civilStatus, source, ...rest } = passenger;
+        void occupation;
+        void civilStatus;
+        void source;
+        return {
+          ...rest,
+          address:
+            (rest.address as string) || (payload.contactAddress as string),
+          mobileNumber:
+            (rest.mobileNumber as string) ||
+            (payload.contactMobileNumber as string),
+          email: (rest.email as string) || (payload.contactEmail as string),
+        };
+      });
     }
 
     // Map paymentMethod to payment_method
@@ -201,33 +129,63 @@ class BookingService {
     delete payload.contactEmail;
     delete payload.paymentMethod;
 
-    // Clean up loose cargos
+    // Clean up vehicles — strip fields not in the client API DTO
+    if (Array.isArray(payload.vehicles)) {
+      payload.vehicles = (payload.vehicles as Record<string, unknown>[]).map(
+        (vehicle) => {
+          const { modelYear, ...rest } = vehicle;
+          void modelYear;
+          return rest;
+        },
+      );
+    }
+
+    // Clean up loose cargos — strip fields not in the client API DTO
     if (Array.isArray(payload.looseCargos)) {
       payload.looseCargos = (
         payload.looseCargos as Record<string, unknown>[]
       ).map((cargo) => {
-        const { volume: _volume, packageType: _packageType, ...rest } = cargo;
+        const { packageType, ...rest } = cargo;
+        void packageType;
         return rest;
       });
     }
 
     // Set booking source as travel_agency
-    payload.bookingSource = "otc";
+    payload.bookingSource = "travel_agency";
 
-    const response = await api.post<SuccessResponse<BookingView>>(
+    // Pass the global TA user ID + agency ID so the client API
+    // can resolve the local booked_by_id in its own DB
+    const user = useAuthStore.getState().user;
+    if (user?.id) {
+      payload.globalUserId = user.id;
+    }
+    if (user?.travel_agency_id) {
+      payload.agencyId = user.travel_agency_id;
+    }
+
+    const response = await api.post<BookingView>(
       TRAVEL_AGENCY_API.BOOKINGS.CREATE,
       payload,
+      { timeout: 60_000 },
     );
     return response.data;
+  }
+
+  async GetMyLocalId(user_id: string, agency_id: number): Promise<string> {
+    const response = await api.get<{ local_id: string }>(
+      `${TRAVEL_AGENCY_API.LOCAL.GET(user_id, agency_id)}`,
+    );
+    return response.data.local_id;
   }
 
   /**
    * Find bookings from the tenant's client API
    * The backend extracts travel_agency_id from the JWT token automatically.
    */
-  async findBookings(
+  async findBookingsByAgent(
     query: FindBookingsQuery,
-  ): Promise<SuccessResponse<PageResult<BookingView>>> {
+  ): Promise<PageResult<BookingView>> {
     const params = new URLSearchParams();
 
     for (const [key, value] of Object.entries(query)) {
@@ -236,7 +194,7 @@ class BookingService {
       }
     }
 
-    const response = await api.get<SuccessResponse<PageResult<BookingView>>>(
+    const response = await api.get<PageResult<BookingView>>(
       `${TRAVEL_AGENCY_API.BOOKINGS.FIND}?${params.toString()}`,
     );
     return response.data;
@@ -246,23 +204,17 @@ class BookingService {
    * Get a specific booking by ID
    * The backend extracts travel_agency_id from the JWT token automatically.
    */
-  async getBookingById(
-    bookingId: string,
-  ): Promise<SuccessResponse<BookingView>> {
-    const response = await api.get<SuccessResponse<BookingView>>(
+  async getBookingById(bookingId: string): Promise<BookingView> {
+    const response = await api.get<BookingView>(
       TRAVEL_AGENCY_API.BOOKINGS.GET(bookingId),
     );
     return response.data;
   }
 
-  /**
-   * Calculate pricing preview for the booking form.
-   * The backend extracts travel_agency_id from the JWT token automatically.
-   */
   async calculatePricing(
     pricingData: CalculatePricingRequest,
-  ): Promise<SuccessResponse<CalculatePricingResponse>> {
-    const response = await api.post<SuccessResponse<CalculatePricingResponse>>(
+  ): Promise<CalculatePricingResponse> {
+    const response = await api.post<CalculatePricingResponse>(
       TRAVEL_AGENCY_API.BOOKINGS.PRICING,
       pricingData,
     );

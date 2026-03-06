@@ -65,6 +65,41 @@ export interface CabinView {
   available?: number;
 }
 
+// ==================== Client API Trip Summary (from /bookings/prepare) ====================
+
+export interface CabinSummary {
+  id: number;
+  name: string;
+  capacity: number;
+}
+
+export interface ShipSummary {
+  id: number;
+  name: string;
+  cabins: CabinSummary[];
+}
+
+export interface TripSummary {
+  id: string;
+  scheduled_departure: string;
+  scheduled_arrival: string;
+  status: string;
+  origin: string;
+  destination: string;
+  route_code: string;
+  ship: ShipSummary | null;
+}
+
+/**
+ * Extended trip type used in the booking form.
+ * Combines TripSummary with form-specific fields (tripType, sequence, cabins).
+ */
+export interface BookingFormTrip extends TripSummary {
+  tripType: "departure" | "return";
+  sequence: number;
+  cabins: CabinSummary[];
+}
+
 // ==================== Booking Rate Types ====================
 
 export interface PassengerRate {
@@ -90,14 +125,14 @@ export interface BookingRateSnapshot {
 // ==================== Prepared Booking Types ====================
 
 export interface PreparedBookingData {
-  departure: TripView[];
-  return: TripView[];
+  departure: TripSummary[];
+  return: TripSummary[];
   routePreference?: Record<string, unknown>;
   passengerTypes: string[];
   vehicleClasses: VehicleClassOption[];
   cargoClasses: CargoClassOption[];
   accommodationCodes: string[];
-  rates?: BookingRateSnapshot[];
+  bookingUiSettings?: Record<string, unknown>;
 }
 
 export interface VehicleClassOption {
@@ -115,59 +150,122 @@ export interface CargoClassOption {
 
 export interface BookingView {
   id: string;
-  reference_code?: string;
+  reference_no?: string;
   booking_type: string;
-  booking_source: string;
+  source: string;
+  booking_status: string;
   status: string;
-  consignee?: string;
   remarks?: string;
   payment_method?: string;
-  total_amount?: number;
-  created_at: string;
-  updated_at?: string;
-  passengers?: BookingPassengerView[];
-  vehicles?: BookingVehicleView[];
-  looseCargos?: BookingLooseCargoView[];
-  trips?: BookingTripView[];
+  has_passengers: boolean;
+  has_cargo: boolean;
+  booking_created_at: string;
+  booking_updated_at?: string;
+  booking_date?: string;
+  issued_by?: string;
+  booked_by_id?: string;
+  booked_by_travel_agent_id?: string;
+  first_departure?: string;
+  last_arrival?: string;
+  ships_used?: string;
+  route_summary?: string;
+  total_trips?: string;
+  is_round_trip?: boolean;
+  total_passengers?: string;
+  total_cargo_items?: string;
+  total_price?: string;
+  price_without_markup?: string;
+  payment_status?: string;
+  payment_status_raw?: string;
+  payment_date?: string;
+  // Detailed trip data (from findOne)
+  trips?: {
+    departure: BookingTripDetail[];
+    return: BookingTripDetail[];
+  };
+  // Payment records (from findOne)
+  payments?: BookingPaymentView[];
 }
 
-export interface BookingPassengerView {
+export interface BookingTripDetail {
   id: string;
+  origin: string;
+  destination: string;
+  ship_name: string;
+  departure: string;
+  arrival: string;
+  sequence: number;
+  passengers: BookingTripPassengerView[];
+  vehicles: BookingTripVehicleView[];
+  cargos: BookingTripCargoView[];
+  cargo: BookingTripCargoView[];
+}
+
+export interface BookingTripPassengerView {
+  booking_trip_passenger_id: string;
+  bookingTripPassengerId: string;
+  name: string;
   first_name: string;
   last_name: string;
   sex: string;
   birthday: string;
-  address?: string;
   nationality?: string;
-  mobile_number?: string;
-  email?: string;
   discount_type?: string;
+  discountType?: string;
+  cabin_id?: number | null;
+  cabinId?: number | null;
+  cabin?: string;
+  accommodation?: string;
+  price: number;
+  checked_in: boolean;
+  checked_in_at?: string;
+  checkInStatus: string;
+  checkInTime?: string;
 }
 
-export interface BookingVehicleView {
+export interface BookingTripVehicleView {
+  booking_trip_cargo_id: string;
+  bookingTripCargoId: string;
   id: string;
   plate_number: string;
-  model_name: string;
+  plateNumber: string;
   make?: string;
-  vehicle_type?: string;
+  model?: string;
+  type?: string;
+  price: number;
+  checked_in: boolean;
+  checkInStatus: string;
+  checkInTime?: string;
 }
 
-export interface BookingLooseCargoView {
+export interface BookingTripCargoView {
+  booking_trip_cargo_id: string;
+  bookingTripCargoId: string;
   id: string;
   description: string;
+  weight: number;
+  unitWeight: number;
   quantity: number;
-  weight?: number;
+  cargo_type: string;
+  price: number;
+  checked_in: boolean;
+  checkInStatus: string;
+  checkInTime?: string;
 }
 
-export interface BookingTripView {
+export interface BookingPaymentView {
   id: string;
-  trip_id: string;
-  trip_type: string;
-  departure_date?: string;
-  route?: {
-    src_port_name: string;
-    dest_port_name: string;
-  };
+  payment_method?: string;
+  amount: number;
+  payment_status?: string;
+  payment_date?: string;
+  transaction_number?: string;
+  epayment_method?: string;
+  cheque_number?: string;
+  account_name?: string;
+  payee_name?: string;
+  issuer_name?: string;
+  cheque_date?: string;
 }
 
 // ==================== Search/Filter Types ====================
@@ -180,6 +278,8 @@ export interface FindBookingsQuery {
   booking_type?: string;
   date_from?: string;
   date_to?: string;
+  userId?: string;
+  agencyId?: number | null;
 }
 
 export interface AvailableTripsQuery {
@@ -253,6 +353,7 @@ export interface CargoPriceDetail {
   cargoType: "rolling" | "loose";
   cargoClassCode: string;
   baseFare: number;
+  insuranceAmount?: number;
   currency: string;
   rateUnit?: string;
 }

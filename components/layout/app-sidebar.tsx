@@ -84,14 +84,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <Image
                     src="/ayahay-icon.png"
-                    alt="Ayahay"
+                    alt="Hayahai"
                     width={24}
                     height={24}
                     className="rounded"
                   />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Ayahay Travel</span>
+                  <span className="truncate font-semibold">Hayahai Travel</span>
                   <span className="truncate text-xs text-muted-foreground">
                     Travel Agency
                   </span>

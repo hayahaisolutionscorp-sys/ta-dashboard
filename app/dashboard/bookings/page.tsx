@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBookings } from "@/hooks/queries/bookings/use-bookings";
+import { useAuthStore } from "@/lib/stores/auth.store";
 
 function statusVariant(status: string) {
   const s = status.toLowerCase();
@@ -27,22 +28,23 @@ export default function BookingsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const currentUser = useAuthStore((s) => s.user);
 
   const { data, isLoading, error, refetch } = useBookings({
     page,
     page_size: 20,
+    userId: currentUser?.id,
+    agencyId: currentUser?.travel_agency_id,
   });
 
-  const bookings = data?.data?.results ?? [];
-  const total = data?.data?.total ?? 0;
+  const bookings = data?.results ?? [];
+  const total = data?.total ?? 0;
 
   const filtered = search
     ? bookings.filter(
         (b) =>
-          (b.reference_code ?? "")
-            .toLowerCase()
-            .includes(search.toLowerCase()) ||
-          (b.consignee ?? "").toLowerCase().includes(search.toLowerCase()),
+          (b.reference_no ?? "").toLowerCase().includes(search.toLowerCase()) ||
+          (b.route_summary ?? "").toLowerCase().includes(search.toLowerCase()),
       )
     : bookings;
 
@@ -73,7 +75,7 @@ export default function BookingsPage() {
         <div className="relative max-w-sm">
           <IconSearch className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
-            placeholder="Search by reference or consignee..."
+            placeholder="Search by reference or route..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -155,14 +157,14 @@ export default function BookingsPage() {
                     className="grid grid-cols-6 gap-4 py-3 border-b last:border-0 items-center text-sm"
                   >
                     <span className="font-mono text-xs">
-                      {booking.reference_code ?? booking.id.slice(0, 8)}
+                      {booking.reference_no ?? booking.id.slice(0, 8)}
                     </span>
                     <span>{booking.booking_type}</span>
                     <span className="text-muted-foreground">
-                      {booking.booking_source}
+                      {booking.source}
                     </span>
                     <span className="text-muted-foreground">
-                      {new Date(booking.created_at).toLocaleDateString(
+                      {new Date(booking.booking_created_at).toLocaleDateString(
                         "en-PH",
                         {
                           month: "short",

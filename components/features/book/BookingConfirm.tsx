@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { BookingFormData } from "@/lib/validators/booking.validators";
-import type { PreparedBookingData } from "@/lib/types/booking.types";
+import type { PreparedBookingData } from "@/constants/types/booking.types";
 import {
   IconUser,
   IconCar,

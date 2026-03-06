@@ -2,33 +2,18 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { PreparedBookingData } from "@/lib/types/booking.types";
+import type {
+  PreparedBookingData,
+  BookingFormTrip,
+} from "@/constants/types/booking.types";
 import { IconShip, IconCalendar, IconRoute } from "@tabler/icons-react";
-
-interface TripInfo {
-  id?: string;
-  tripId?: string;
-  tripType: "departure" | "return";
-  sequence: number;
-  cabins?: Array<{ id: number; name: string }>;
-  ship?: { name?: string; cabins?: Array<{ id: number; name: string }> };
-  route?: {
-    srcPort?: { name?: string };
-    destPort?: { name?: string };
-  };
-  departureDate?: string;
-  status?: string;
-}
 
 interface TripSummaryPanelProps {
   bookingData: PreparedBookingData;
-  allTrips: TripInfo[];
+  allTrips: BookingFormTrip[];
 }
 
-export default function TripSummaryPanel({
-  bookingData,
-  allTrips,
-}: TripSummaryPanelProps) {
+export default function TripSummaryPanel({ allTrips }: TripSummaryPanelProps) {
   const formatDateTime = (dateStr?: string): string => {
     if (!dateStr) return "—";
     const d = new Date(dateStr);
@@ -87,17 +72,6 @@ export default function TripSummaryPanel({
           </CardContent>
         </Card>
       )}
-
-      {/* Rates info */}
-      {bookingData.rates && bookingData.rates.length > 0 && (
-        <Card>
-          <CardContent className="p-3">
-            <p className="text-[10px] text-muted-foreground">
-              {bookingData.rates.length} rate snapshot(s) loaded
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
@@ -106,7 +80,7 @@ function TripCard({
   trip,
   formatDateTime,
 }: {
-  trip: TripInfo;
+  trip: BookingFormTrip;
   formatDateTime: (dateStr?: string) => string;
 }) {
   return (
@@ -114,8 +88,7 @@ function TripCard({
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <IconRoute className="h-3 w-3" />
         <span>
-          {trip.route?.srcPort?.name ?? "—"} →{" "}
-          {trip.route?.destPort?.name ?? "—"}
+          {trip.origin ?? "—"} → {trip.destination ?? "—"}
         </span>
       </div>
       {trip.ship?.name && (
@@ -124,10 +97,10 @@ function TripCard({
           <span>{trip.ship.name}</span>
         </div>
       )}
-      {trip.departureDate && (
+      {trip.scheduled_departure && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <IconCalendar className="h-3 w-3" />
-          <span>{formatDateTime(trip.departureDate)}</span>
+          <span>{formatDateTime(trip.scheduled_departure)}</span>
         </div>
       )}
       {trip.cabins && trip.cabins.length > 0 && (

@@ -47,4 +47,20 @@ export const TRAVEL_AGENCY_API = {
     IDS: (agencyId: number) =>
       `/travel-agencies-tenants/agency/${agencyId}/tenantId`,
   },
+  LOCAL: {
+    GET: (userId: string, agency_id: number) =>
+      `/travel-agencies-booking/${userId}/agencyId/${agency_id}/local-id`,
+  },
+  RATES: {
+    FOR_ROUTE: (routeCode: string) => `/rates/route/${routeCode}`,
+  },
+  MARKUP: {
+    CREATE: "/travel-agency-markup",
+    BY_AGENT: (agentId: string) => `/travel-agency-markup/agent/${agentId}`,
+    BY_ROUTE: (routeId: number) => `/travel-agency-markup/route/${routeId}`,
+    BY_AGENT_AND_ROUTE: (agentId: string, routeId: number) =>
+      `/travel-agency-markup/agent/${agentId}/route/${routeId}`,
+    UPDATE: (agentId: string, routeId: number) =>
+      `/travel-agency-markup/agent/${agentId}/route/${routeId}`,
+  },
 };

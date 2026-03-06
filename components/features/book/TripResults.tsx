@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { IconShip, IconCheck } from "@tabler/icons-react";
-import type { TripView } from "@/lib/types/booking.types";
+import type { TripView } from "@/constants/types/booking.types";
 
 interface TripResultsProps {
   trips: TripView[];

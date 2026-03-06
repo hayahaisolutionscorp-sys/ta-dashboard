@@ -11,5 +11,7 @@ export function useCreateBooking() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
     },
+    retry: 1,
+    retryDelay: 2000,
   });
 }

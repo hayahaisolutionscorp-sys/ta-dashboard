@@ -32,6 +32,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       persistOptions={{
         persister: asyncStoragePersister,
         maxAge: 1000 * 60 * 60 * 24, // 24 hours
+        buster: "v2",
         dehydrateOptions: {
           shouldDehydrateQuery: (query) => {
             // Only persist successful queries
