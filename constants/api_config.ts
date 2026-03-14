@@ -63,4 +63,9 @@ export const TRAVEL_AGENCY_API = {
     UPDATE: (agentId: string, routeId: number) =>
       `/travel-agency-markup/agent/${agentId}/route/${routeId}`,
   },
+  WALLET: {
+    BY_AGENT: (agentId: string) => `/travel-agency-wallet/agent/${agentId}`,
+    DEPOSIT: "/travel-agency-wallet/deposit",
+    WITHDRAWAL_REQUEST: "/travel-agency-wallet/withdrawal-request",
+  },
 };

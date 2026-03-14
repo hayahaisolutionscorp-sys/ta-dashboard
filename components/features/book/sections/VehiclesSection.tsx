@@ -14,19 +14,31 @@ import { IconTrash, IconCar } from "@tabler/icons-react";
 interface Vehicle {
   plateNumber: string;
   make?: string;
-  modelName: string;
+  modelName?: string;
   modelYear?: number;
   vehicleModelId?: number;
   vehicleTypeId?: number;
   usesPendingModel: boolean;
-  driverId: string;
+  driverId?: string;
   cargoClassCode?: string;
   tripAssignments: Array<{ tripId: string }>;
 }
 
+interface PassengerOption {
+  index: number;
+  label: string;
+}
+
+interface ClassOption {
+  code: string;
+  display: string;
+}
+
 interface VehiclesSectionProps {
   vehicles: Vehicle[];
-  vehicleClasses: string[];
+  vehicleClasses: ClassOption[];
+  passengers?: PassengerOption[];
+  isPricingLoading?: boolean;
   onRemove: (index: number) => void;
   onUpdate: (index: number, field: string, value: unknown) => void;
 }
@@ -34,6 +46,8 @@ interface VehiclesSectionProps {
 export default function VehiclesSection({
   vehicles,
   vehicleClasses,
+  passengers = [],
+  isPricingLoading,
   onRemove,
   onUpdate,
 }: VehiclesSectionProps) {
@@ -88,7 +102,7 @@ export default function VehiclesSection({
               <Input
                 placeholder="Model name"
                 className="h-7 text-xs"
-                value={vehicle.modelName}
+                value={vehicle.modelName ?? ""}
                 onChange={(e) => onUpdate(index, "modelName", e.target.value)}
               />
               <Input
@@ -104,16 +118,29 @@ export default function VehiclesSection({
 
             {/* Driver & Class */}
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                placeholder="Driver passenger index (0, 1, ...)"
-                className="h-7 text-xs"
-                value={vehicle.driverId}
-                onChange={(e) => onUpdate(index, "driverId", e.target.value)}
-              />
+              <Select
+                value={vehicle.driverId ?? ""}
+                onValueChange={(val) =>
+                  onUpdate(index, "driverId", val === "__none__" ? "" : val)
+                }
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Driver (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No driver</SelectItem>
+                  {passengers.map((pax) => (
+                    <SelectItem key={pax.index} value={pax.index.toString()}>
+                      {pax.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {vehicleClasses.length > 0 && (
                 <Select
                   value={vehicle.cargoClassCode ?? ""}
+                  disabled={isPricingLoading}
                   onValueChange={(val) =>
                     onUpdate(index, "cargoClassCode", val)
                   }
@@ -123,8 +150,8 @@ export default function VehiclesSection({
                   </SelectTrigger>
                   <SelectContent>
                     {vehicleClasses.map((cls) => (
-                      <SelectItem key={cls} value={cls}>
-                        {cls}
+                      <SelectItem key={cls.code} value={cls.code}>
+                        {cls.display}
                       </SelectItem>
                     ))}
                   </SelectContent>

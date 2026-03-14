@@ -32,40 +32,24 @@ export const VehicleTripAssignmentSchema = z.object({
   tripId: z.string().min(1, "Invalid trip ID"),
 });
 
-export const VehicleSchema = z
-  .object({
-    plateNumber: z.string().min(1, "Plate number is required"),
-    make: z.string().optional(),
-    modelName: z.string().min(1, "Model name is required"),
-    modelYear: z
-      .number()
-      .min(1900)
-      .max(new Date().getFullYear() + 1)
-      .optional(),
-    vehicleModelId: z.number().positive("Vehicle model is required").optional(),
-    vehicleTypeId: z.number().positive("Vehicle type is required").optional(),
-    usesPendingModel: z.boolean(),
-    driverId: z.string().min(1, "Driver is required"),
-    cargoClassCode: z.string().optional(),
-    tripAssignments: z
-      .array(VehicleTripAssignmentSchema)
-      .min(1, "Vehicle must be assigned to at least one trip"),
-  })
-  .refine(
-    (data) => {
-      const hasExistingModel = data.vehicleModelId !== undefined;
-      const hasManualEntry =
-        data.vehicleTypeId !== undefined &&
-        data.make !== undefined &&
-        data.make.trim().length > 0;
-      return hasExistingModel || hasManualEntry;
-    },
-    {
-      message:
-        "Either select an existing vehicle model or provide vehicle type and make for manual entry",
-      path: ["vehicleTypeId"],
-    },
-  );
+export const VehicleSchema = z.object({
+  plateNumber: z.string().min(1, "Plate number is required"),
+  make: z.string().optional(),
+  modelName: z.string().optional(),
+  modelYear: z
+    .number()
+    .min(1900)
+    .max(new Date().getFullYear() + 1)
+    .optional(),
+  vehicleModelId: z.number().positive("Vehicle model is required").optional(),
+  vehicleTypeId: z.number().positive("Vehicle type is required").optional(),
+  usesPendingModel: z.boolean(),
+  driverId: z.string().optional(),
+  cargoClassCode: z.string().optional(),
+  tripAssignments: z
+    .array(VehicleTripAssignmentSchema)
+    .min(1, "Vehicle must be assigned to at least one trip"),
+});
 
 export const LooseCargoTripAssignmentSchema = z.object({
   tripId: z.string().min(1, "Invalid trip ID"),
@@ -92,12 +76,13 @@ export const CreateBookingSchema = z
     vehicles: z.array(VehicleSchema),
     looseCargos: z.array(LooseCargoSchema),
     consignee: z.string().optional(),
-    contactAddress: z.string().optional(),
-    contactMobileNumber: z.string().optional(),
-    contactEmail: z.union([z.literal(""), z.string().email()]).optional(),
+    contactAddress: z.string().min(1, "Contact address is required"),
+    contactMobileNumber: z.string().min(1, "Contact mobile number is required"),
+    contactEmail: z.string().email("Invalid contact email").min(1, "Contact email is required"),
     voucherCode: z.string().optional(),
     referralCode: z.string().optional(),
     remarks: z.string().optional(),
+    ta_markup: z.number().nonnegative("Markup must be 0 or greater").optional(),
   })
   .refine(
     (data) => {
@@ -115,15 +100,37 @@ export const CreateBookingSchema = z
   )
   .refine(
     (data) => {
-      const passengerIds = data.passengers.map((_, index) => index.toString());
-      const invalidVehicles = data.vehicles.filter(
-        (vehicle) => !passengerIds.includes(vehicle.driverId),
+      if (data.vehicles.length === 0) return true;
+      const passengerIndices = data.passengers.map((_, index) =>
+        index.toString(),
       );
+      const vehiclesWithDriver = data.vehicles.filter(
+        (vehicle) =>
+          vehicle.driverId !== undefined &&
+          vehicle.driverId !== null &&
+          vehicle.driverId !== "",
+      );
+      const invalidVehicles = vehiclesWithDriver.filter(
+        (vehicle) => !passengerIndices.includes(vehicle.driverId!),
+      );
+      if (invalidVehicles.length > 0) {
+        console.log("[Validation] Invalid driver references:", {
+          passengerIndices,
+          vehiclesWithDriver: vehiclesWithDriver.map((v) => ({
+            plate: v.plateNumber,
+            driverId: v.driverId,
+          })),
+          invalidVehicles: invalidVehicles.map((v) => ({
+            plate: v.plateNumber,
+            driverId: v.driverId,
+          })),
+        });
+      }
       return invalidVehicles.length === 0;
     },
     {
       message:
-        "All vehicles must have a driver selected from the passengers list",
+        "One or more vehicles have a driver that doesn't match a valid passenger. Leave the driver field empty or select a valid passenger.",
       path: ["vehicles"],
     },
   );

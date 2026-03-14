@@ -1,13 +1,16 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { FormProvider, useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useBookingData } from "@/hooks/queries/bookings/use-booking-data";
 import { useCreateBooking } from "@/hooks/mutations/bookings/use-create-booking";
+import { useRoutesForAgency } from "@/hooks/queries/routes/use-routes";
+import { useMarkupByAgentAndRoute } from "@/hooks/queries/markup/use-markups";
+import { useAuthStore } from "@/lib/stores/auth.store";
 import {
   CreateBookingSchema,
   type BookingFormData,
@@ -20,6 +23,7 @@ import PassengersSection from "@/components/features/book/sections/PassengersSec
 import VehiclesSection from "@/components/features/book/sections/VehiclesSection";
 import LooseCargosSection from "@/components/features/book/sections/LooseCargosSection";
 import ContactInfoSection from "@/components/features/book/sections/ContactInfoSection";
+import AdditionalInfoSection from "@/components/features/book/sections/AdditionalInfoSection";
 import BookingControls from "@/components/features/book/sections/BookingControls";
 import BookingConfirm from "@/components/features/book/BookingConfirm";
 import TripSummaryPanel from "@/components/features/book/TripSummaryPanel";
@@ -39,6 +43,20 @@ export default function CreateBookingPage() {
   } = useBookingData(searchParams);
 
   const bookingData = bookingResponse;
+
+  console.log(
+    "[CreateBookingPage] bookingData loaded:",
+    bookingData
+      ? {
+          departure: bookingData.departure?.length,
+          return: bookingData.return?.length,
+          passengerTypes: bookingData.passengerTypes,
+          vehicleClasses: bookingData.vehicleClasses,
+          cargoClasses: bookingData.cargoClasses,
+          accommodationCodes: bookingData.accommodationCodes,
+        }
+      : "null",
+  );
 
   // 2-step flow: 1 = form, 2 = confirm
   const [step, setStep] = useState(1);
@@ -72,13 +90,28 @@ export default function CreateBookingPage() {
     ];
   }, [bookingData]);
 
+  // Fetch the current agent's markup for this route to use as default
+  const currentUser = useAuthStore((s) => s.user);
+  const { data: agencyRoutes } = useRoutesForAgency(
+    currentUser?.travel_agency_id,
+  );
+  const bookingRouteCode = allTrips[0]?.route_code ?? null;
+  const matchedRoute = agencyRoutes?.find(
+    (r) => `${r.src_port_code}-${r.dest_port_code}` === bookingRouteCode,
+  );
+  const { data: agentMarkup } = useMarkupByAgentAndRoute(
+    currentUser?.id,
+    matchedRoute?.id,
+  );
+  const defaultMarkup = agentMarkup?.flat_passenger_markup ?? 0;
+
   // Use options directly from the prepared booking data (client API provides these)
   const derivedOptions = useMemo(() => {
     if (!bookingData) {
       return {
         discountTypes: ["Adult", "Child", "Senior", "Student", "PWD", "Infant"],
-        vehicleClasses: [] as string[],
-        cargoClasses: [] as string[],
+        vehicleClasses: [] as Array<{ code: string; display: string }>,
+        cargoClasses: [] as Array<{ code: string; display: string }>,
         validAccommodations: new Set<string>(),
         availableCabinTypes: [] as string[],
       };
@@ -90,11 +123,9 @@ export default function CreateBookingPage() {
         ? bookingData.passengerTypes
         : ["Adult", "Child", "Senior", "Student", "PWD", "Infant"];
 
-    // Vehicle and cargo classes come directly from the API
-    const vehicleClasses = (bookingData.vehicleClasses ?? []).map(
-      (vc) => vc.code,
-    );
-    const cargoClasses = (bookingData.cargoClasses ?? []).map((cc) => cc.code);
+    // Vehicle and cargo classes come directly from the API (keep full objects for display)
+    const vehicleClasses = bookingData.vehicleClasses ?? [];
+    const cargoClasses = bookingData.cargoClasses ?? [];
 
     // Accommodation codes from the API
     const validAccommodations = new Set(bookingData.accommodationCodes ?? []);
@@ -132,17 +163,7 @@ export default function CreateBookingPage() {
     };
   }, [bookingData]);
 
-  const { discountTypes, vehicleClasses, cargoClasses, availableCabinTypes } =
-    derivedOptions;
-
-  const [cabinType, setCabinType] = useState<string>("");
-
-  // Set initial cabin type when options load
-  useEffect(() => {
-    if (availableCabinTypes.length > 0 && !cabinType) {
-      setCabinType(availableCabinTypes[0]);
-    }
-  }, [availableCabinTypes, cabinType]);
+  const { discountTypes, vehicleClasses, cargoClasses } = derivedOptions;
 
   // Initialize form
   const form = useForm<BookingFormData>({
@@ -160,6 +181,7 @@ export default function CreateBookingPage() {
       voucherCode: "",
       referralCode: "",
       remarks: "",
+      ta_markup: 0,
     },
   });
 
@@ -181,10 +203,62 @@ export default function CreateBookingPage() {
     }
   }, [allTrips, form]);
 
+  // Sync ta_markup form value when the agent's configured markup loads
+  useEffect(() => {
+    form.setValue("ta_markup", defaultMarkup, { shouldValidate: false });
+  }, [defaultMarkup, form]);
+
   const { watch, handleSubmit } = form;
   const passengers = watch("passengers");
   const vehicles = watch("vehicles");
   const looseCargos = watch("looseCargos");
+  const taMarkup = watch("ta_markup");
+
+  // Create a pricing-relevant fingerprint that changes when any pricing field
+  // changes — not just when rows are added/removed.
+  // This captures: passenger type, cabin, vehicle class, cargo class.
+  const [formVersion, setFormVersion] = useState(0);
+  useEffect(() => {
+    const subscription = form.watch((_value, { name }) => {
+      // Only bump the version for pricing-relevant field changes
+      // Note: passenger cabin/discount changes go through "tripAssignments"
+      // because the whole array is replaced via onUpdate(index, "tripAssignments", ...)
+      if (
+        name?.includes("discountType") ||
+        name?.includes("cabinId") ||
+        name?.includes("tripAssignments") ||
+        name?.includes("cargoClassCode") ||
+        name?.includes("vehicleTypeId") ||
+        name?.includes("weight") ||
+        name?.includes("quantity")
+      ) {
+        setFormVersion((v) => v + 1);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  // Track pricing loading state from TripSummaryPanel to disable
+  // pricing-relevant selects while rates are being fetched
+  const [isPricingLoading, setIsPricingLoading] = useState(false);
+  const handlePricingLoadingChange = useCallback((loading: boolean) => {
+    setIsPricingLoading(loading);
+  }, []);
+
+  // Build a live form snapshot for TripSummaryPanel pricing
+  // Re-computes when rows change OR when pricing-relevant fields change
+  const watchedFormData = useMemo(() => {
+    const data = { ...form.getValues(), passengers, vehicles, looseCargos, ta_markup: taMarkup };
+    console.log(
+      "[CreateBookingPage] watchedFormData updated (v" + formVersion + "):",
+      {
+        passengersCount: passengers?.length ?? 0,
+        vehiclesCount: vehicles?.length ?? 0,
+        looseCargosCount: looseCargos?.length ?? 0,
+      },
+    );
+    return data;
+  }, [passengers, vehicles, looseCargos, taMarkup, form, formVersion]);
 
   // Add/remove handlers
   const handleAddPassenger = () => {
@@ -194,33 +268,32 @@ export default function CreateBookingPage() {
       discountTypes[0] ||
       "Adult";
 
-    form.setValue("passengers", [
-      ...current,
-      {
-        firstName: "",
-        lastName: "",
-        email: "",
-        sex: "male" as const,
-        birthday: new Date(2000, 0, 1),
-        address: "",
-        nationality: "FILIPINO",
-        occupation: "",
-        civilStatus: "Single",
-        mobileNumber: "",
-        tripAssignments: allTrips.map((trip) => {
-          const matchingCabin = trip.cabins?.find(
-            (c) => (c.name || "").toUpperCase() === cabinType.toUpperCase(),
-          );
-          return {
-            tripId: trip.id,
-            cabinId: matchingCabin
-              ? matchingCabin.id
-              : (trip.cabins?.at(0)?.id ?? null),
-            discountType: defaultDiscount,
-          };
-        }),
-      },
-    ]);
+    const newPassenger = {
+      firstName: "",
+      lastName: "",
+      email: "",
+      sex: "male" as const,
+      birthday: new Date(2000, 0, 1),
+      address: "",
+      nationality: "FILIPINO",
+      occupation: "",
+      civilStatus: "Single",
+      mobileNumber: "",
+      tripAssignments: allTrips.map((trip) => {
+        return {
+          tripId: trip.id,
+          cabinId: trip.cabins?.at(0)?.id ?? null,
+          cabin_type_name: trip.cabins?.at(0)?.name,
+          discountType: defaultDiscount,
+        };
+      }),
+    };
+
+    console.log("[CreateBookingPage] Adding passenger:", {
+      defaultDiscount,
+      tripAssignments: newPassenger.tripAssignments,
+    });
+    form.setValue("passengers", [...current, newPassenger]);
   };
 
   const handleRemovePassenger = (index: number) => {
@@ -233,23 +306,25 @@ export default function CreateBookingPage() {
 
   const handleAddVehicle = () => {
     const current = form.getValues("vehicles");
-    form.setValue("vehicles", [
-      ...current,
-      {
-        plateNumber: "",
-        make: "Toyota",
-        modelName: "",
-        modelYear: new Date().getFullYear(),
-        vehicleModelId: undefined,
-        vehicleTypeId: 1,
-        usesPendingModel: false,
-        driverId: "",
-        cargoClassCode: "",
-        tripAssignments: allTrips.map((trip) => ({
-          tripId: trip.id,
-        })),
-      },
-    ]);
+    const newVehicle = {
+      plateNumber: "",
+      make: "Toyota",
+      modelName: "",
+      modelYear: new Date().getFullYear(),
+      vehicleModelId: undefined,
+      vehicleTypeId: 1,
+      usesPendingModel: false,
+      driverId: undefined,
+      cargoClassCode: "",
+      tripAssignments: allTrips.map((trip) => ({
+        tripId: trip.id,
+      })),
+    };
+    console.log("[CreateBookingPage] Adding vehicle:", {
+      vehicleClasses,
+      tripCount: allTrips.length,
+    });
+    form.setValue("vehicles", [...current, newVehicle]);
   };
 
   const handleRemoveVehicle = (index: number) => {
@@ -262,18 +337,20 @@ export default function CreateBookingPage() {
 
   const handleAddCargo = () => {
     const current = form.getValues("looseCargos");
-    form.setValue("looseCargos", [
-      ...current,
-      {
-        description: "",
-        weight: 1,
-        quantity: 1,
-        cargoClassCode: "",
-        tripAssignments: allTrips.map((trip) => ({
-          tripId: trip.id,
-        })),
-      },
-    ]);
+    const newCargo = {
+      description: "",
+      weight: 1,
+      quantity: 1,
+      cargoClassCode: "",
+      tripAssignments: allTrips.map((trip) => ({
+        tripId: trip.id,
+      })),
+    };
+    console.log("[CreateBookingPage] Adding cargo:", {
+      cargoClasses,
+      tripCount: allTrips.length,
+    });
+    form.setValue("looseCargos", [...current, newCargo]);
   };
 
   const handleRemoveCargo = (index: number) => {
@@ -284,32 +361,21 @@ export default function CreateBookingPage() {
     );
   };
 
-  const handleCabinTypeChange = (type: string) => {
-    setCabinType(type);
-    const currentPassengers = form.getValues("passengers");
-    const updatedPassengers = currentPassengers.map((p) => ({
-      ...p,
-      tripAssignments: p.tripAssignments.map((assignment, index: number) => {
-        const trip = allTrips[index];
-        const matchingCabin = trip?.cabins?.find(
-          (c) => (c.name || "").toUpperCase() === type.toUpperCase(),
-        );
-        return {
-          ...assignment,
-          cabinId: matchingCabin ? matchingCabin.id : assignment.cabinId,
-        };
-      }),
-    }));
-    form.setValue("passengers", updatedPassengers);
-  };
-
-  const onSubmit: SubmitHandler<BookingFormData> = () => {
+  const onSubmit: SubmitHandler<BookingFormData> = (data) => {
+    console.log(
+      "[CreateBookingPage] Form validated successfully. Moving to confirm step.",
+      JSON.stringify(data, null, 2),
+    );
     // Go to confirm step
     setStep(2);
   };
 
   const handleConfirmBooking = () => {
     const rawFormData = form.getValues();
+    console.log(
+      "[CreateBookingPage] Confirming booking, raw form data:",
+      JSON.stringify(rawFormData, null, 2),
+    );
 
     // Clean data for submission
     const formData = {
@@ -333,7 +399,12 @@ export default function CreateBookingPage() {
   };
 
   const onError = (errors: Record<string, unknown>) => {
-    console.error("Form validation failed:", errors);
+    console.error("Form validation failed:", JSON.stringify(errors, null, 2));
+    console.error("Form validation errors (raw):", errors);
+    // Log each top-level error for easier debugging
+    for (const [key, value] of Object.entries(errors)) {
+      console.error(`  Field "${key}":`, JSON.stringify(value, null, 2));
+    }
   };
 
   if (isLoading) {
@@ -425,9 +496,6 @@ export default function CreateBookingPage() {
                             passengersCount={passengers?.length || 0}
                             vehiclesCount={vehicles?.length || 0}
                             looseCargosCount={looseCargos?.length || 0}
-                            cabinType={cabinType}
-                            availableCabinTypes={availableCabinTypes}
-                            onCabinTypeChange={handleCabinTypeChange}
                             onAddPassenger={handleAddPassenger}
                             onAddVehicle={handleAddVehicle}
                             onAddCargo={handleAddCargo}
@@ -445,6 +513,7 @@ export default function CreateBookingPage() {
                             passengers={passengers}
                             trips={allTrips}
                             discountTypes={discountTypes}
+                            isPricingLoading={isPricingLoading}
                             onRemove={handleRemovePassenger}
                             onUpdate={(
                               index: number,
@@ -468,6 +537,13 @@ export default function CreateBookingPage() {
                           <VehiclesSection
                             vehicles={vehicles}
                             vehicleClasses={vehicleClasses}
+                            passengers={(passengers ?? []).map((pax, idx) => ({
+                              index: idx,
+                              label: pax.firstName
+                                ? `${pax.firstName} ${pax.lastName ?? ""}`.trim()
+                                : `Passenger ${idx + 1}`,
+                            }))}
+                            isPricingLoading={isPricingLoading}
                             onRemove={handleRemoveVehicle}
                             onUpdate={(
                               index: number,
@@ -491,6 +567,7 @@ export default function CreateBookingPage() {
                           <LooseCargosSection
                             cargos={looseCargos}
                             cargoClasses={cargoClasses}
+                            isPricingLoading={isPricingLoading}
                             onRemove={handleRemoveCargo}
                             onUpdate={(
                               index: number,
@@ -508,25 +585,9 @@ export default function CreateBookingPage() {
                         </div>
                       )}
 
-                      {/* Remarks */}
+                      {/* Additional Details (Markup + Remarks) */}
                       <div className="bg-gray-50/50 rounded-lg p-3 border border-gray-100">
-                        <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">
-                          Additional Details
-                        </h3>
-                        <div className="space-y-2">
-                          <label
-                            htmlFor="remarks"
-                            className="text-sm font-medium"
-                          >
-                            Remarks
-                          </label>
-                          <textarea
-                            id="remarks"
-                            className="w-full border rounded-md p-2 text-sm min-h-15 resize-none"
-                            placeholder="Any special requests or notes..."
-                            {...form.register("remarks")}
-                          />
-                        </div>
+                        <AdditionalInfoSection defaultMarkup={defaultMarkup} />
                       </div>
 
                       {/* Submit */}
@@ -557,7 +618,12 @@ export default function CreateBookingPage() {
 
           {/* Trip Summary Side Panel */}
           <div className="hidden lg:block w-72 shrink-0">
-            <TripSummaryPanel bookingData={bookingData} allTrips={allTrips} />
+            <TripSummaryPanel
+              bookingData={bookingData}
+              allTrips={allTrips}
+              formData={watchedFormData}
+              onPricingLoadingChange={handlePricingLoadingChange}
+            />
           </div>
         </div>
       </div>

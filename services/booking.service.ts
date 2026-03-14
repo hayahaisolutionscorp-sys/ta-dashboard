@@ -85,7 +85,12 @@ class BookingService {
       typeof searchParams === "string" ? searchParams : searchParams.toString();
 
     const url = `${TRAVEL_AGENCY_API.BOOKINGS.PREPARE}?${queryString}`;
+    console.log("[BookingService] prepareBooking URL:", url);
     const response = await api.get<PreparedBookingData>(url);
+    console.log(
+      "[BookingService] prepareBooking response:",
+      JSON.stringify(response.data, null, 2),
+    );
     return response.data;
   }
 
@@ -128,6 +133,11 @@ class BookingService {
     delete payload.contactMobileNumber;
     delete payload.contactEmail;
     delete payload.paymentMethod;
+
+    // Strip ta_markup when zero or unset — backend only needs it when > 0
+    if (!payload.ta_markup || (payload.ta_markup as number) <= 0) {
+      delete payload.ta_markup;
+    }
 
     // Clean up vehicles — strip fields not in the client API DTO
     if (Array.isArray(payload.vehicles)) {
@@ -214,9 +224,17 @@ class BookingService {
   async calculatePricing(
     pricingData: CalculatePricingRequest,
   ): Promise<CalculatePricingResponse> {
+    console.log(
+      "[BookingService] calculatePricing request:",
+      JSON.stringify(pricingData, null, 2),
+    );
     const response = await api.post<CalculatePricingResponse>(
       TRAVEL_AGENCY_API.BOOKINGS.PRICING,
       pricingData,
+    );
+    console.log(
+      "[BookingService] calculatePricing response:",
+      JSON.stringify(response.data, null, 2),
     );
     return response.data;
   }

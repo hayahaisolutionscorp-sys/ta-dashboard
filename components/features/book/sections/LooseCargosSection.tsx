@@ -21,9 +21,15 @@ interface LooseCargo {
   tripAssignments: Array<{ tripId: string }>;
 }
 
+interface ClassOption {
+  code: string;
+  display: string;
+}
+
 interface LooseCargosSectionProps {
   cargos: LooseCargo[];
-  cargoClasses: string[];
+  cargoClasses: ClassOption[];
+  isPricingLoading?: boolean;
   onRemove: (index: number) => void;
   onUpdate: (index: number, field: string, value: unknown) => void;
 }
@@ -31,6 +37,7 @@ interface LooseCargosSectionProps {
 export default function LooseCargosSection({
   cargos,
   cargoClasses,
+  isPricingLoading,
   onRemove,
   onUpdate,
 }: LooseCargosSectionProps) {
@@ -117,6 +124,7 @@ export default function LooseCargosSection({
                   <label className="text-[10px] text-gray-500">Class</label>
                   <Select
                     value={cargo.cargoClassCode ?? ""}
+                    disabled={isPricingLoading}
                     onValueChange={(val) =>
                       onUpdate(index, "cargoClassCode", val)
                     }
@@ -126,8 +134,8 @@ export default function LooseCargosSection({
                     </SelectTrigger>
                     <SelectContent>
                       {cargoClasses.map((cls) => (
-                        <SelectItem key={cls} value={cls}>
-                          {cls}
+                        <SelectItem key={cls.code} value={cls.code}>
+                          {cls.display}
                         </SelectItem>
                       ))}
                     </SelectContent>

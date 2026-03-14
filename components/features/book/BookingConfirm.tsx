@@ -12,6 +12,7 @@ import {
   IconMail,
   IconPhone,
   IconMapPin,
+  IconReceipt,
 } from "@tabler/icons-react";
 
 interface BookingConfirmProps {
@@ -67,8 +68,8 @@ export default function BookingConfirm({
                   Departure
                 </Badge>
                 <span>
-                  {trip.route?.src_port_name ?? "Origin"} →{" "}
-                  {trip.route?.dest_port_name ?? "Destination"}
+                  {trip.origin ?? "Origin"} →{" "}
+                  {trip.destination ?? "Destination"}
                 </span>
               </div>
             ))}
@@ -81,8 +82,8 @@ export default function BookingConfirm({
                   Return
                 </Badge>
                 <span>
-                  {trip.route?.src_port_name ?? "Origin"} →{" "}
-                  {trip.route?.dest_port_name ?? "Destination"}
+                  {trip.origin ?? "Origin"} →{" "}
+                  {trip.destination ?? "Destination"}
                 </span>
               </div>
             ))}
@@ -218,6 +219,30 @@ export default function BookingConfirm({
           )}
         </CardContent>
       </Card>
+
+      {/* Agency Markup */}
+      {formData.ta_markup !== undefined && formData.ta_markup > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <IconReceipt className="h-4 w-4 text-green-600" />
+              <h3 className="text-sm font-semibold">Agency Markup</h3>
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">
+                ₱
+                {formData.ta_markup.toLocaleString("en-PH", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+              <span className="text-xs text-muted-foreground ml-2">
+                will be added on top of the base fare
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Actions */}
       <div className="flex justify-end gap-2 pt-2">

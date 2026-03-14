@@ -20,7 +20,7 @@ export default function ContactInfoSection() {
       <div className="space-y-2">
         <div>
           <Label htmlFor="contactAddress" className="text-xs">
-            Address
+            Address *
           </Label>
           <Input
             id="contactAddress"
@@ -28,11 +28,16 @@ export default function ContactInfoSection() {
             className="h-8 text-sm"
             {...register("contactAddress")}
           />
+          {errors.contactAddress && (
+            <p className="text-xs text-red-500 mt-1">
+              {errors.contactAddress.message}
+            </p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="contactMobileNumber" className="text-xs">
-            Mobile Number
+            Mobile Number *
           </Label>
           <Input
             id="contactMobileNumber"
@@ -40,11 +45,16 @@ export default function ContactInfoSection() {
             className="h-8 text-sm"
             {...register("contactMobileNumber")}
           />
+          {errors.contactMobileNumber && (
+            <p className="text-xs text-red-500 mt-1">
+              {errors.contactMobileNumber.message}
+            </p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="contactEmail" className="text-xs">
-            Email
+            Email *
           </Label>
           <Input
             id="contactEmail"

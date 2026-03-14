@@ -12,6 +12,7 @@ import {
   IconHelp,
   IconLogout,
   IconZoomMoney,
+  IconWallet,
 } from "@tabler/icons-react";
 
 import {
@@ -49,6 +50,11 @@ const navItems = [
     title: "Rates",
     url: "/dashboard/rates",
     icon: IconZoomMoney,
+  },
+  {
+    title: "Wallet",
+    url: "/dashboard/wallet",
+    icon: IconWallet,
   },
 ];
 

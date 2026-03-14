@@ -133,6 +133,7 @@ export interface PreparedBookingData {
   cargoClasses: CargoClassOption[];
   accommodationCodes: string[];
   bookingUiSettings?: Record<string, unknown>;
+  rates?: BookingRateSnapshot[];
 }
 
 export interface VehicleClassOption {
@@ -206,17 +207,31 @@ export interface BookingTripPassengerView {
   bookingTripPassengerId: string;
   name: string;
   first_name: string;
+  firstName?: string;
   last_name: string;
+  lastName?: string;
   sex: string;
   birthday: string;
   nationality?: string;
+  email?: string;
+  mobile_number?: string;
+  mobileNumber?: string;
   discount_type?: string;
   discountType?: string;
   cabin_id?: number | null;
   cabinId?: number | null;
   cabin?: string;
+  cabinName?: string;
   accommodation?: string;
+  cabin_type_name?: string;
+  cabinTypeName?: string;
   price: number;
+  booking_status?: string;
+  bookingStatus?: string;
+  removed_reason?: string;
+  removedReason?: string;
+  removed_reason_type?: string;
+  removedReasonType?: string;
   checked_in: boolean;
   checked_in_at?: string;
   checkInStatus: string;
@@ -232,7 +247,17 @@ export interface BookingTripVehicleView {
   make?: string;
   model?: string;
   type?: string;
+  vehicleTypeId?: number;
+  cargoClassCode?: string;
   price: number;
+  booking_status?: string;
+  bookingStatus?: string;
+  removed_reason?: string;
+  removedReason?: string;
+  removed_reason_type?: string;
+  removedReasonType?: string;
+  driver_passenger_id?: string;
+  driverPassengerId?: string;
   checked_in: boolean;
   checkInStatus: string;
   checkInTime?: string;
@@ -247,7 +272,16 @@ export interface BookingTripCargoView {
   unitWeight: number;
   quantity: number;
   cargo_type: string;
+  cargoClassCode?: string;
   price: number;
+  booking_status?: string;
+  bookingStatus?: string;
+  removed_reason?: string;
+  removedReason?: string;
+  removed_reason_type?: string;
+  removedReasonType?: string;
+  owner_passenger_id?: string;
+  ownerPassengerId?: string;
   checked_in: boolean;
   checkInStatus: string;
   checkInTime?: string;
@@ -325,11 +359,13 @@ export interface CargoPricingInput {
   weight?: number;
   quantity?: number;
   volume?: number;
+  vehicleTypeId?: number;
   tripAssignments: PricingTripAssignment[];
 }
 
 export interface CalculatePricingRequest {
   routeCode: string;
+  routeCodes?: string[];
   snapshotId?: number;
   tripIds: string[];
   passengers: PassengerPricingInput[];

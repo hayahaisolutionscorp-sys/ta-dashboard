@@ -43,6 +43,7 @@ interface PassengersSectionProps {
   passengers: Passenger[];
   trips: TripInfo[];
   discountTypes: string[];
+  isPricingLoading?: boolean;
   onRemove: (index: number) => void;
   onUpdate: (index: number, field: string, value: unknown) => void;
 }
@@ -51,6 +52,7 @@ export default function PassengersSection({
   passengers,
   trips,
   discountTypes,
+  isPricingLoading,
   onRemove,
   onUpdate,
 }: PassengersSectionProps) {
@@ -151,6 +153,17 @@ export default function PassengersSection({
             {passenger.tripAssignments.map((assignment, tripIdx) => {
               const trip = trips[tripIdx];
               if (!trip) return null;
+
+              // Deduplicate cabins by name — the ship may have multiple
+              // physical cabins of the same type (e.g. two "Economy" cabins)
+              const uniqueCabins = trip.cabins
+                ? Array.from(
+                    new Map(
+                      trip.cabins.map((c) => [c.name.toUpperCase(), c]),
+                    ).values(),
+                  )
+                : [];
+
               return (
                 <div
                   key={`trip-assign-${tripIdx}`}
@@ -158,6 +171,7 @@ export default function PassengersSection({
                 >
                   <Select
                     value={assignment.discountType}
+                    disabled={isPricingLoading}
                     onValueChange={(val) => {
                       const updated = [...passenger.tripAssignments];
                       updated[tripIdx] = {
@@ -179,11 +193,12 @@ export default function PassengersSection({
                     </SelectContent>
                   </Select>
 
-                  {trip.cabins && trip.cabins.length > 1 && (
+                  {uniqueCabins.length > 1 && (
                     <Select
                       value={
                         assignment.cabinId ? String(assignment.cabinId) : ""
                       }
+                      disabled={isPricingLoading}
                       onValueChange={(val) => {
                         const updated = [...passenger.tripAssignments];
                         updated[tripIdx] = {
@@ -197,7 +212,7 @@ export default function PassengersSection({
                         <SelectValue placeholder="Cabin" />
                       </SelectTrigger>
                       <SelectContent>
-                        {trip.cabins.map((cabin) => (
+                        {uniqueCabins.map((cabin) => (
                           <SelectItem key={cabin.id} value={String(cabin.id)}>
                             {cabin.name}
                           </SelectItem>

@@ -1,22 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { IconPlus, IconUsers, IconCar, IconPackage } from "@tabler/icons-react";
 
 interface BookingControlsProps {
   passengersCount: number;
   vehiclesCount: number;
   looseCargosCount: number;
-  cabinType: string;
-  availableCabinTypes: string[];
-  onCabinTypeChange: (type: string) => void;
   onAddPassenger: () => void;
   onAddVehicle: () => void;
   onAddCargo: () => void;
@@ -26,32 +16,12 @@ export default function BookingControls({
   passengersCount,
   vehiclesCount,
   looseCargosCount,
-  cabinType,
-  availableCabinTypes,
-  onCabinTypeChange,
   onAddPassenger,
   onAddVehicle,
   onAddCargo,
 }: BookingControlsProps) {
   return (
     <div className="space-y-3">
-      {/* Cabin Type Selector */}
-      <div className="space-y-1">
-        <label className="text-xs text-gray-500 font-medium">Cabin Type</label>
-        <Select value={cabinType} onValueChange={onCabinTypeChange}>
-          <SelectTrigger className="h-8 text-sm">
-            <SelectValue placeholder="Select cabin" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableCabinTypes.map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* Add Buttons */}
       <div className="space-y-2">
         <Button
