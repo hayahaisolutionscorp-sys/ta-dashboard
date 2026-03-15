@@ -1,3 +1,20 @@
+/**
+ * TripSummaryPanel — real-time pricing sidebar on the create booking page.
+ *
+ * Responsibilities:
+ *  - Builds a CalculatePricingRequest from the live form state and sends it
+ *    to the pricing API via usePricingCalculation whenever passengers, cabins,
+ *    cargo classes, or markup change.
+ *  - For round trips, renders a per-leg breakdown (Departure / Return) by
+ *    matching PassengerPriceDetail.tripId and CargoPriceDetail.tripId against
+ *    each trip's ID. Charges are split evenly between legs.
+ *  - Groups charges by service_domain (PASSENGER / VEHICLE / CARGO) and
+ *    labels them accordingly within each leg block.
+ *  - Surfaces the snapshotId from the pricing response to the parent form
+ *    via the onSnapshotId callback so rates are locked at submission time.
+ *  - Notifies the parent of loading state via onPricingLoadingChange so
+ *    pricing-sensitive selects can be disabled while a fetch is in flight.
+ */
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -97,7 +114,6 @@ export default function TripSummaryPanel({
     const routeCode = allTrips.at(0)?.route_code ?? "";
 
     if (!routeCode) {
-      console.log("[TripSummaryPanel] No route_code available on trips");
       return null;
     }
 
@@ -147,10 +163,6 @@ export default function TripSummaryPanel({
       cargos: cargos.length > 0 ? cargos : undefined,
     };
 
-    console.log(
-      "[TripSummaryPanel] Built pricing request:",
-      JSON.stringify(request, null, 2),
-    );
     return request;
   }, [formData, allTrips]);
 
@@ -165,17 +177,6 @@ export default function TripSummaryPanel({
   useEffect(() => {
     onPricingLoadingChange?.(isPricingLoading || isPricingFetching);
   }, [isPricingLoading, isPricingFetching, onPricingLoadingChange]);
-
-  useEffect(() => {
-    console.log("[TripSummaryPanel] === PRICING DATA CHANGED ===");
-    console.log("[TripSummaryPanel] pricing:", pricing);
-    if (pricing) {
-      console.log("[TripSummaryPanel] pricing keys:", Object.keys(pricing));
-      console.log("[TripSummaryPanel] passengerPrices:", JSON.stringify(pricing.passengerPrices));
-      console.log("[TripSummaryPanel] cargoPrices:", JSON.stringify(pricing.cargoPrices));
-      console.log("[TripSummaryPanel] grandTotal:", pricing.grandTotal);
-    }
-  }, [pricing, isPricingLoading]);
 
   useEffect(() => {
     if (pricing?.snapshotId) {

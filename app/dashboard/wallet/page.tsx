@@ -93,7 +93,7 @@ function TransactionRow({ activity }: { activity: WalletActivity }) {
     </div>
   );
 }
-
+// would like to add actual online transaction here
 function DepositDialog({
   agentId,
   agencyId,

@@ -1,3 +1,22 @@
+/**
+ * BookingService — central service for the TA booking flow.
+ *
+ * Booking flow (in order):
+ *  1. Routes      — getRoutesForTa()       fetch port-pair routes available to the agency
+ *  2. Trip search — searchTrips()          find available trips for a route + date
+ *                   getAvailableDates()    power the date picker with dates that have trips
+ *  3. Prepare     — prepareBooking()       fetch trip details, cabin types, discount types,
+ *                                          vehicle/cargo classes for the booking form
+ *  4. Pricing     — calculatePricing()     get real-time fare breakdown before confirming
+ *  5. Create      — createBooking()        submit the finalized booking to the client API
+ *  6. Post-create — bulkInvalidate()       cancel seats/cargo on an existing booking
+ *                   bulkRefund()           refund items on an existing booking
+ *                   bulkRebook()           move items to a new trip on an existing booking
+ *
+ * All requests that require agency context (prepare, create, find, get, pricing,
+ * bulk ops) are routed through the TA proxy in ayahay-api-v2, which extracts the
+ * travel_agency_id from the TA JWT automatically.
+ */
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { TRAVEL_AGENCY_API, TRIPS_API } from "@/constants/api_config";
@@ -21,7 +40,9 @@ import { RouteEntity } from "@/constants";
 
 class BookingService {
   /**
-   * Search for available trips across tenants
+   * Search for available trips on a given route and departure date.
+   * Results are paginated and sorted by departureDate by default.
+   * Used in step 2 of the booking flow (trip selection screen).
    */
   async searchTrips(query: AvailableTripsQuery): Promise<AvailableTripsResult> {
     const params = new URLSearchParams();
@@ -48,7 +69,9 @@ class BookingService {
   }
 
   /**
-   * Get dates that have available trips for a route
+   * Get the list of dates that have at least one available trip for a route.
+   * Powers the date picker on the trip search screen so only valid dates
+   * are selectable.
    */
   async getAvailableDates(
     originCode: string,
@@ -66,6 +89,11 @@ class BookingService {
     return response.data;
   }
 
+  /**
+   * Fetch the port-pair routes that a travel agency is allowed to book.
+   * Used to populate the origin/destination selects and to look up the
+   * agent's markup configuration for a specific route.
+   */
   async getRoutesForTa(agencyId: number): Promise<RouteEntity[]> {
     const res = await api.get(TRAVEL_AGENCY_API.ROUTES.BY_AGENCY(agencyId));
     const routes: RouteEntity[] = res.data;
@@ -78,8 +106,10 @@ class BookingService {
   }
 
   /**
-   * Prepare booking data — fetch trips, cabins, rates for selected trip IDs
-   * The backend extracts travel_agency_id from the JWT token automatically.
+   * Prepare booking data for the selected trip IDs.
+   * Returns trip details, available cabin types, discount types (passenger types),
+   * vehicle classes, cargo classes, and accommodation codes needed to render
+   * the booking form. The backend resolves travel_agency_id from the JWT.
    */
   async prepareBooking(
     searchParams: URLSearchParams | string,
@@ -88,18 +118,16 @@ class BookingService {
       typeof searchParams === "string" ? searchParams : searchParams.toString();
 
     const url = `${TRAVEL_AGENCY_API.BOOKINGS.PREPARE}?${queryString}`;
-    console.log("[BookingService] prepareBooking URL:", url);
     const response = await api.get<PreparedBookingData>(url);
-    console.log(
-      "[BookingService] prepareBooking response:",
-      JSON.stringify(response.data, null, 2),
-    );
     return response.data;
   }
 
   /**
-   * Create a booking through the tenant's client API
-   * The backend extracts travel_agency_id from the JWT token automatically.
+   * Submit a completed booking form to the client API.
+   * Handles field mapping (camelCase ↔ snake_case), strips fields that are
+   * not accepted by the client API DTO, sets bookingSource to "travel_agency",
+   * and forwards the TA user's globalUserId + agencyId for local ID resolution.
+   * Uses a 60-second timeout to accommodate slow downstream processing.
    */
   async createBooking(bookingData: BookingFormData): Promise<BookingView> {
     // Map form data for the API (same as TMS pattern)
@@ -233,23 +261,26 @@ class BookingService {
     return response.data;
   }
 
+  /**
+   * Calculate real-time pricing for the current form state.
+   * Called by usePricingCalculation whenever passengers, cabins, or cargo
+   * change. Returns per-passenger/cargo base fares, applied charges, tax
+   * totals, and a snapshotId that locks the rates at submission time.
+   */
   async calculatePricing(
     pricingData: CalculatePricingRequest,
   ): Promise<CalculatePricingResponse> {
-    console.log(
-      "[BookingService] calculatePricing request:",
-      JSON.stringify(pricingData, null, 2),
-    );
     const response = await api.post<CalculatePricingResponse>(
       TRAVEL_AGENCY_API.BOOKINGS.PRICING,
       pricingData,
     );
-    console.log(
-      "[BookingService] calculatePricing response:",
-      JSON.stringify(response.data, null, 2),
-    );
     return response.data;
   }
+  /**
+   * Cancel (invalidate) selected passengers/cargo on an existing booking.
+   * Used on the booking detail page to void individual items without
+   * cancelling the entire booking.
+   */
   async bulkInvalidate(bookingId: string, data: BulkInvalidateRequest) {
     const response = await api.post(
       TRAVEL_AGENCY_API.BOOKINGS.BULK_INVALIDATE(bookingId),
@@ -258,6 +289,9 @@ class BookingService {
     return response.data;
   }
 
+  /**
+   * Issue refunds for selected passengers/cargo on an existing booking.
+   */
   async bulkRefund(bookingId: string, data: BulkRefundRequest) {
     const response = await api.post(
       TRAVEL_AGENCY_API.BOOKINGS.BULK_REFUND(bookingId),
@@ -266,6 +300,11 @@ class BookingService {
     return response.data;
   }
 
+  /**
+   * Move selected passengers/cargo from an existing booking to a new trip.
+   * Uses a 60-second timeout because the operation creates new booking records
+   * in the client API.
+   */
   async bulkRebook(bookingId: string, data: BulkRebookRequest) {
     const response = await api.post(
       TRAVEL_AGENCY_API.BOOKINGS.BULK_REBOOK(bookingId),

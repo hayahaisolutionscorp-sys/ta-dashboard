@@ -1,3 +1,15 @@
+/**
+ * useAvailableDates — fetches dates that have at least one available trip
+ * for an origin → destination pair.
+ *
+ * Powers the date picker on the trip search screen so the user can only
+ * select valid departure dates. Re-fetches on mount or window focus if
+ * the cached result is empty, to handle the case where no trips existed
+ * initially but new schedules have since been added.
+ *
+ * - staleTime: 5 min
+ * - retry: 2 with exponential back-off (max 8 s)
+ */
 import { bookingService } from "@/services/booking.service";
 import { useQuery } from "@tanstack/react-query";
 

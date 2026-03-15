@@ -11,8 +11,20 @@ interface UsePricingCalculationParams {
 }
 
 /**
- * Hook that calls the pricing API to get real-time pricing estimates.
- * Uses react-query with a stable key derived from the request body.
+ * usePricingCalculation — real-time pricing query for the booking form.
+ *
+ * Calls BookingService.calculatePricing() whenever the request changes
+ * (passenger type, cabin selection, cargo class, etc.). The query key is
+ * derived from the full JSON-serialized request so any field change triggers
+ * a fresh fetch.
+ *
+ * Results include per-passenger/cargo base fares, applied charges, tax
+ * totals, and a snapshotId. The snapshotId is stored in the form and sent
+ * with createBooking() to lock rates at the time the user reviewed pricing.
+ *
+ * - staleTime: 30 s — avoids redundant calls while the user is editing
+ * - retry: 1 — one automatic retry on transient network errors
+ * - Only enabled when at least one passenger or cargo item is present
  */
 export function usePricingCalculation({
   request,
@@ -31,15 +43,7 @@ export function usePricingCalculation({
       if (!request) {
         throw new Error("No pricing request");
       }
-      console.log(
-        "[usePricingCalculation] Calling pricing API:",
-        JSON.stringify(request, null, 2),
-      );
       const result = await bookingService.calculatePricing(request);
-      console.log(
-        "[usePricingCalculation] Pricing API response:",
-        JSON.stringify(result, null, 2),
-      );
       return result;
     },
     enabled:

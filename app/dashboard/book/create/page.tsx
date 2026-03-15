@@ -1,3 +1,31 @@
+/**
+ * CreateBookingPage — 2-step booking form for travel agency agents.
+ *
+ * Step 1 — Form
+ *   Renders all booking sections (passengers, vehicles, loose cargos, contact
+ *   info, markup/remarks) inside a React Hook Form context validated by
+ *   CreateBookingSchema. The "Review Booking" button is only enabled when the
+ *   form is fully valid (mode: "onChange"). The TripSummaryPanel sidebar shows
+ *   real-time pricing and locks the snapshotId into the form.
+ *
+ * Step 2 — Confirm
+ *   Renders BookingConfirm with a read-only summary of the form data.
+ *   On "Confirm", calls useCreateBooking() and redirects to /dashboard/bookings
+ *   on success.
+ *
+ * Data flow:
+ *  - useBookingData()        fetches trip/cabin/class metadata for the form
+ *  - useRoutesForAgency()    fetches the agency's routes to resolve markup
+ *  - useMarkupByAgentAndRoute() fetches the agent's configured markup for the route
+ *  - allTrips                flattens departure + return segments into a single array
+ *  - watchedFormData         live snapshot passed to TripSummaryPanel for pricing
+ *  - formVersion             bumped on pricing-relevant field changes to trigger
+ *                            a re-render of watchedFormData without re-running effects
+ *
+ *
+ *
+ * This lacks actual online transaction
+ */
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
@@ -43,20 +71,6 @@ export default function CreateBookingPage() {
   } = useBookingData(searchParams);
 
   const bookingData = bookingResponse;
-
-  console.log(
-    "[CreateBookingPage] bookingData loaded:",
-    bookingData
-      ? {
-          departure: bookingData.departure?.length,
-          return: bookingData.return?.length,
-          passengerTypes: bookingData.passengerTypes,
-          vehicleClasses: bookingData.vehicleClasses,
-          cargoClasses: bookingData.cargoClasses,
-          accommodationCodes: bookingData.accommodationCodes,
-        }
-      : "null",
-  );
 
   // 2-step flow: 1 = form, 2 = confirm
   const [step, setStep] = useState(1);
@@ -250,15 +264,13 @@ export default function CreateBookingPage() {
   // Build a live form snapshot for TripSummaryPanel pricing
   // Re-computes when rows change OR when pricing-relevant fields change
   const watchedFormData = useMemo(() => {
-    const data = { ...form.getValues(), passengers, vehicles, looseCargos, ta_markup: taMarkup };
-    console.log(
-      "[CreateBookingPage] watchedFormData updated (v" + formVersion + "):",
-      {
-        passengersCount: passengers?.length ?? 0,
-        vehiclesCount: vehicles?.length ?? 0,
-        looseCargosCount: looseCargos?.length ?? 0,
-      },
-    );
+    const data = {
+      ...form.getValues(),
+      passengers,
+      vehicles,
+      looseCargos,
+      ta_markup: taMarkup,
+    };
     return data;
   }, [passengers, vehicles, looseCargos, taMarkup, form, formVersion]);
 
@@ -291,10 +303,6 @@ export default function CreateBookingPage() {
       }),
     };
 
-    console.log("[CreateBookingPage] Adding passenger:", {
-      defaultDiscount,
-      tripAssignments: newPassenger.tripAssignments,
-    });
     form.setValue("passengers", [...current, newPassenger]);
   };
 
@@ -322,10 +330,6 @@ export default function CreateBookingPage() {
         tripId: trip.id,
       })),
     };
-    console.log("[CreateBookingPage] Adding vehicle:", {
-      vehicleClasses,
-      tripCount: allTrips.length,
-    });
     form.setValue("vehicles", [...current, newVehicle]);
   };
 
@@ -348,10 +352,6 @@ export default function CreateBookingPage() {
         tripId: trip.id,
       })),
     };
-    console.log("[CreateBookingPage] Adding cargo:", {
-      cargoClasses,
-      tripCount: allTrips.length,
-    });
     form.setValue("looseCargos", [...current, newCargo]);
   };
 
@@ -363,21 +363,12 @@ export default function CreateBookingPage() {
     );
   };
 
-  const onSubmit: SubmitHandler<BookingFormData> = (data) => {
-    console.log(
-      "[CreateBookingPage] Form validated successfully. Moving to confirm step.",
-      JSON.stringify(data, null, 2),
-    );
-    // Go to confirm step
+  const onSubmit: SubmitHandler<BookingFormData> = () => {
     setStep(2);
   };
 
   const handleConfirmBooking = () => {
     const rawFormData = form.getValues();
-    console.log(
-      "[CreateBookingPage] Confirming booking, raw form data:",
-      JSON.stringify(rawFormData, null, 2),
-    );
 
     // Clean data for submission
     const formData = {
@@ -394,19 +385,7 @@ export default function CreateBookingPage() {
       onSuccess: () => {
         router.push(`/dashboard/bookings`);
       },
-      onError: (err) => {
-        console.error("Failed to create booking:", err);
-      },
     });
-  };
-
-  const onError = (errors: Record<string, unknown>) => {
-    console.error("Form validation failed:", JSON.stringify(errors, null, 2));
-    console.error("Form validation errors (raw):", errors);
-    // Log each top-level error for easier debugging
-    for (const [key, value] of Object.entries(errors)) {
-      console.error(`  Field "${key}":`, JSON.stringify(value, null, 2));
-    }
   };
 
   if (isLoading) {
@@ -485,7 +464,7 @@ export default function CreateBookingPage() {
           <div className="flex-1 min-w-0">
             {step === 1 ? (
               <FormProvider {...form}>
-                <form onSubmit={handleSubmit(onSubmit, onError)}>
+                <form onSubmit={handleSubmit(onSubmit)}>
                   <Card>
                     <CardContent className="p-4 md:p-6 space-y-4">
                       {/* Controls & Contact Info */}
@@ -603,7 +582,12 @@ export default function CreateBookingPage() {
                         >
                           Cancel
                         </Button>
-                        <Button type="submit" disabled={!form.formState.isValid}>Review Booking</Button>
+                        <Button
+                          type="submit"
+                          disabled={!form.formState.isValid}
+                        >
+                          Review Booking
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>

@@ -1,3 +1,22 @@
+/**
+ * Booking form validation schemas (Zod).
+ *
+ * Schema hierarchy:
+ *  TripAssignmentSchema      — per-trip cabin + discount type selection for a passenger
+ *  PassengerSchema           — individual passenger fields + trip assignments
+ *  TripSchema                — departure/return trip reference stored in form state
+ *  VehicleTripAssignmentSchema — trip reference for a vehicle
+ *  VehicleSchema             — vehicle fields + trip assignments (supports round-trip toggle)
+ *  LooseCargoTripAssignmentSchema — trip reference for a loose cargo item
+ *  LooseCargoSchema          — loose cargo fields + trip assignments
+ *
+ *  CreateBookingSchema       — root schema combining all of the above, with two
+ *                              cross-field refinements:
+ *    1. At least one passenger, vehicle, or cargo item must be present.
+ *    2. If a vehicle has a driverId set, it must reference a valid passenger index.
+ *
+ * BookingFormData            — TypeScript type inferred from CreateBookingSchema.
+ */
 import { z } from "zod";
 
 export const TripAssignmentSchema = z.object({
@@ -114,19 +133,6 @@ export const CreateBookingSchema = z
       const invalidVehicles = vehiclesWithDriver.filter(
         (vehicle) => !passengerIndices.includes(vehicle.driverId!),
       );
-      if (invalidVehicles.length > 0) {
-        console.log("[Validation] Invalid driver references:", {
-          passengerIndices,
-          vehiclesWithDriver: vehiclesWithDriver.map((v) => ({
-            plate: v.plateNumber,
-            driverId: v.driverId,
-          })),
-          invalidVehicles: invalidVehicles.map((v) => ({
-            plate: v.plateNumber,
-            driverId: v.driverId,
-          })),
-        });
-      }
       return invalidVehicles.length === 0;
     },
     {

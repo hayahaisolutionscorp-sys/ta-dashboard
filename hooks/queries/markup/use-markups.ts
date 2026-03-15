@@ -1,3 +1,19 @@
+/**
+ * Markup query hooks.
+ *
+ *  useMarkupsByAgent(agentId)
+ *    Fetches all markup records for an agent across all routes.
+ *    Used on the /dashboard/rates page to display and manage an agent's markups.
+ *
+ *  useMarkupsByRoute(routeId)
+ *    Fetches all markup records for a route across all agents.
+ *    Useful for admin views showing per-route markup configurations.
+ *
+ *  useMarkupByAgentAndRoute(agentId, routeId)
+ *    Fetches the single markup for an agent × route pair.
+ *    Used on the create-booking page to pre-fill ta_markup in the form.
+ *    Returns null on 404 (no markup configured) — callers should default to 0.
+ */
 import { useQuery } from "@tanstack/react-query";
 import { markupService } from "@/services/markup.service";
 

@@ -1,3 +1,16 @@
+/**
+ * Wallet mutation hooks.
+ *
+ *  useDeposit()
+ *    Credits funds to an agent's wallet. Called by agency admins.
+ *    On success, invalidates the ["wallet", agentId] cache so the
+ *    wallet page balance and activity list refresh immediately.
+ *
+ *  useRequestWithdrawal()
+ *    Submits a withdrawal request for admin approval.
+ *    Balance is not debited until the request is approved on the admin side.
+ *    On success, invalidates the wallet cache to reflect the pending state.
+ */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { walletService } from "@/services/wallet.service";
 import type {

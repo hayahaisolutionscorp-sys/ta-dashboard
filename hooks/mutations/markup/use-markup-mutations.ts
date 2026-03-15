@@ -1,3 +1,16 @@
+/**
+ * Markup mutation hooks.
+ *
+ *  useCreateMarkup()
+ *    Creates a new markup record for an agent × route pair.
+ *    On success, invalidates the agent and route markup caches so the
+ *    rates page list and form default both reflect the new value.
+ *
+ *  useUpdateMarkup()
+ *    Updates the flat_passenger_markup on an existing agent × route record.
+ *    On success, invalidates the agent, route, and agent×route caches
+ *    so all consumers (list, form default, booking pre-fill) refresh.
+ */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { markupService } from "@/services/markup.service";
 import type {
