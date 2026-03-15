@@ -12,6 +12,9 @@ import type {
   TripView,
   CalculatePricingRequest,
   CalculatePricingResponse,
+  BulkInvalidateRequest,
+  BulkRefundRequest,
+  BulkRebookRequest,
 } from "@/constants/types/booking.types";
 import type { BookingFormData } from "@/lib/validators/booking.validators";
 import { RouteEntity } from "@/constants";
@@ -161,8 +164,17 @@ class BookingService {
       });
     }
 
+    // Map rateSnapshotId → snapshotId for the client API (ensures pricing consistency)
+    if (payload.rateSnapshotId) {
+      payload.snapshotId = payload.rateSnapshotId;
+    }
+    delete payload.rateSnapshotId;
+
     // Set booking source as travel_agency
     payload.bookingSource = "travel_agency";
+    if (!payload.payment_method) {
+      payload.payment_method = "CASH";
+    }
 
     // Pass the global TA user ID + agency ID so the client API
     // can resolve the local booked_by_id in its own DB
@@ -235,6 +247,30 @@ class BookingService {
     console.log(
       "[BookingService] calculatePricing response:",
       JSON.stringify(response.data, null, 2),
+    );
+    return response.data;
+  }
+  async bulkInvalidate(bookingId: string, data: BulkInvalidateRequest) {
+    const response = await api.post(
+      TRAVEL_AGENCY_API.BOOKINGS.BULK_INVALIDATE(bookingId),
+      data,
+    );
+    return response.data;
+  }
+
+  async bulkRefund(bookingId: string, data: BulkRefundRequest) {
+    const response = await api.post(
+      TRAVEL_AGENCY_API.BOOKINGS.BULK_REFUND(bookingId),
+      data,
+    );
+    return response.data;
+  }
+
+  async bulkRebook(bookingId: string, data: BulkRebookRequest) {
+    const response = await api.post(
+      TRAVEL_AGENCY_API.BOOKINGS.BULK_REBOOK(bookingId),
+      data,
+      { timeout: 60_000 },
     );
     return response.data;
   }

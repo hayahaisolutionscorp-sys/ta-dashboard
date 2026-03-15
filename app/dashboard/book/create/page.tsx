@@ -168,6 +168,7 @@ export default function CreateBookingPage() {
   // Initialize form
   const form = useForm<BookingFormData>({
     resolver: zodResolver(CreateBookingSchema),
+    mode: "onChange",
     defaultValues: {
       bookingType: "Single",
       trips: [],
@@ -182,6 +183,7 @@ export default function CreateBookingPage() {
       referralCode: "",
       remarks: "",
       ta_markup: 0,
+      rateSnapshotId: undefined,
     },
   });
 
@@ -537,6 +539,7 @@ export default function CreateBookingPage() {
                           <VehiclesSection
                             vehicles={vehicles}
                             vehicleClasses={vehicleClasses}
+                            trips={allTrips}
                             passengers={(passengers ?? []).map((pax, idx) => ({
                               index: idx,
                               label: pax.firstName
@@ -567,6 +570,7 @@ export default function CreateBookingPage() {
                           <LooseCargosSection
                             cargos={looseCargos}
                             cargoClasses={cargoClasses}
+                            trips={allTrips}
                             isPricingLoading={isPricingLoading}
                             onRemove={handleRemoveCargo}
                             onUpdate={(
@@ -599,7 +603,7 @@ export default function CreateBookingPage() {
                         >
                           Cancel
                         </Button>
-                        <Button type="submit">Review Booking</Button>
+                        <Button type="submit" disabled={!form.formState.isValid}>Review Booking</Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -623,6 +627,7 @@ export default function CreateBookingPage() {
               allTrips={allTrips}
               formData={watchedFormData}
               onPricingLoadingChange={handlePricingLoadingChange}
+              onSnapshotId={(id) => form.setValue("rateSnapshotId", id)}
             />
           </div>
         </div>

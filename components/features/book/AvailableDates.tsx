@@ -9,6 +9,7 @@ interface AvailableDatesProps {
   isLoading: boolean;
   selectedDate: string;
   onDateSelect: (date: string) => void;
+  title?: string;
 }
 
 function formatDateLabel(dateStr: string) {
@@ -24,6 +25,7 @@ export default function AvailableDates({
   isLoading,
   selectedDate,
   onDateSelect,
+  title = "Available Dates",
 }: AvailableDatesProps) {
   if (isLoading) {
     return (
@@ -57,7 +59,7 @@ export default function AvailableDates({
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-xs sm:text-sm font-medium text-muted-foreground">
         <IconCalendar className="h-4 w-4" />
-        Available Dates ({dates.length})
+        {title} ({dates.length})
       </div>
       {/* Negative margin + padding trick for edge-to-edge scrolling on mobile */}
       <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-none snap-x snap-mandatory">

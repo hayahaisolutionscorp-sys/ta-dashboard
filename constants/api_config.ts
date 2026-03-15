@@ -36,6 +36,10 @@ export const TRAVEL_AGENCY_API = {
     FIND: "/travel-agencies-booking",
     GET: (id: string) => `/travel-agencies-booking/${id}`,
     PRICING: "/travel-agencies-booking/pricing",
+    BULK_INVALIDATE: (id: string) =>
+      `/travel-agencies-booking/${id}/bulk-invalidate`,
+    BULK_REFUND: (id: string) => `/travel-agencies-booking/${id}/bulk-refund`,
+    BULK_REBOOK: (id: string) => `/travel-agencies-booking/${id}/bulk-rebook`,
   },
   ROUTES: {
     BY_AGENCY: (agencyId: number) =>

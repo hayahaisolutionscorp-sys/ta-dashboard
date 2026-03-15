@@ -83,6 +83,7 @@ export const CreateBookingSchema = z
     referralCode: z.string().optional(),
     remarks: z.string().optional(),
     ta_markup: z.number().nonnegative("Markup must be 0 or greater").optional(),
+    rateSnapshotId: z.number().optional(),
   })
   .refine(
     (data) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   IconArrowLeft,
   IconTicket,
@@ -15,6 +16,9 @@ import {
   IconCheck,
   IconX,
   IconPrinter,
+  IconRefresh,
+  IconCash,
+  IconBan,
 } from "@tabler/icons-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBooking } from "@/hooks/queries/bookings/use-booking";
+import { InvalidateModal, RefundModal, RebookModal } from "./_components";
 import type {
   BookingTripDetail,
   BookingTripPassengerView,
@@ -231,7 +236,7 @@ function PassengerRow({
         {p.discount_type ?? p.discountType ?? "Regular"}
       </span>
       <span className="text-muted-foreground">
-        {p.cabin ?? p.accommodation ?? p.cabinTypeName ?? "—"}
+        {p.cabinTypeName ?? p.cabin_type_name ?? p.accommodation ?? "—"}
       </span>
       <span className="text-right">{formatCurrency(p.price)}</span>
       <span className="text-center">
@@ -320,7 +325,7 @@ function PaymentSection({ payments }: { payments?: BookingPaymentView[] }) {
         <div className="rounded-md border">
           <div className="grid grid-cols-5 gap-2 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
             <span>Method</span>
-            <span className="text-right">Amount</span>
+            <span>Amount</span>
             <span>Status</span>
             <span>Date</span>
             <span>Reference</span>
@@ -331,9 +336,7 @@ function PaymentSection({ payments }: { payments?: BookingPaymentView[] }) {
               className="grid grid-cols-5 gap-2 px-3 py-2 text-sm border-b last:border-0 items-center"
             >
               <span>{p.payment_method ?? p.epayment_method ?? "—"}</span>
-              <span className="text-right font-medium">
-                {formatCurrency(p.amount)}
-              </span>
+              <span className="font-medium">{formatCurrency(p.amount)}</span>
               <span>
                 <Badge variant={statusVariant(p.payment_status ?? "pending")}>
                   {p.payment_status ?? "Pending"}
@@ -381,6 +384,9 @@ export default function BookingDetailPage() {
   const bookingId = params.id as string;
 
   const { data: booking, isLoading, error } = useBooking(bookingId);
+  const [invalidateOpen, setInvalidateOpen] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [rebookOpen, setRebookOpen] = useState(false);
 
   if (isLoading) return <BookingDetailSkeleton />;
 
@@ -441,110 +447,164 @@ export default function BookingDetailPage() {
   );
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push("/dashboard/bookings")}
-            >
-              <IconArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold tracking-tight">
-                  {booking.reference_no ?? bookingId.slice(0, 8)}
-                </h1>
-                <Badge
-                  variant={statusVariant(
-                    booking.status ?? booking.booking_status,
-                  )}
-                >
-                  {booking.status ?? booking.booking_status}
-                </Badge>
+    <>
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
+          {/* Header */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push("/dashboard/bookings")}
+              >
+                <IconArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-bold tracking-tight">
+                    {booking.reference_no ?? bookingId.slice(0, 8)}
+                  </h1>
+                  <Badge
+                    variant={statusVariant(
+                      booking.status ?? booking.booking_status,
+                    )}
+                  >
+                    {booking.status ?? booking.booking_status}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Booked on {formatDateTime(booking.booking_created_at)}
+                  {booking.source ? ` • Source: ${booking.source}` : ""}
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Booked on {formatDateTime(booking.booking_created_at)}
-                {booking.source ? ` • Source: ${booking.source}` : ""}
-              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => globalThis.print()}
+              >
+                <IconPrinter className="mr-1 h-4 w-4" />
+                Print
+              </Button>
+              {!["invalidated", "cancelled", "completed"].includes(
+                (booking.status ?? booking.booking_status ?? "").toLowerCase(),
+              ) && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRebookOpen(true)}
+                  >
+                    <IconRefresh className="mr-1 h-4 w-4" />
+                    Rebook
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRefundOpen(true)}
+                  >
+                    <IconCash className="mr-1 h-4 w-4" />
+                    Refund
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setInvalidateOpen(true)}
+                  >
+                    <IconBan className="mr-1 h-4 w-4" />
+                    Invalidate
+                  </Button>
+                </>
+              )}
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => globalThis.print()}
-            >
-              <IconPrinter className="mr-1 h-4 w-4" />
-              Print
-            </Button>
-          </div>
-        </div>
 
-        {/* Summary Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center p-4">
-              <p className="text-sm text-muted-foreground">Route</p>
-              <p className="text-lg font-bold">
-                {booking.route_summary ?? "—"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center p-4">
-              <p className="text-sm text-muted-foreground">Passengers</p>
-              <p className="text-lg font-bold">{totalPassengers}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center p-4">
-              <p className="text-sm text-muted-foreground">Vehicles</p>
-              <p className="text-lg font-bold">{totalVehicles}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center p-4">
-              <p className="text-sm text-muted-foreground">Cargo</p>
-              <p className="text-lg font-bold">{totalCargos}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center p-4">
-              <p className="text-sm text-muted-foreground">Total Price</p>
-              <p className="text-lg font-bold text-green-600">
-                {formatCurrency(booking.total_price)}
-              </p>
-              {booking.price_without_markup &&
-                booking.price_without_markup !== booking.total_price && (
+          {/* Summary Cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-4">
+                <p className="text-sm text-muted-foreground">Route</p>
+                <p className="text-lg font-bold">
+                  {booking.route_summary ?? "—"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-4">
+                <p className="text-sm text-muted-foreground">Passengers</p>
+                <p className="text-lg font-bold">{totalPassengers}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-4">
+                <p className="text-sm text-muted-foreground">Vehicles</p>
+                <p className="text-lg font-bold">{totalVehicles}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-4">
+                <p className="text-sm text-muted-foreground">Cargo</p>
+                <p className="text-lg font-bold">{totalCargos}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center p-4">
+                <p className="text-sm text-muted-foreground">Ticket Price</p>
+                <p className="text-lg font-bold text-green-600">
+                  {formatCurrency(
+                    Number(booking.total_price ?? 0) -
+                      Number(booking.ta_markup ?? 0),
+                  )}
+                </p>
+                {booking.ta_markup && Number(booking.ta_markup) > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Base: {formatCurrency(booking.price_without_markup)}
+                    + {formatCurrency(booking.ta_markup)} markup
                   </p>
                 )}
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        <Separator />
+          <Separator />
 
-        {/* Trip Details */}
-        {hasReturn ? (
-          <Tabs defaultValue="departure">
-            <TabsList>
-              <TabsTrigger value="departure">
-                Departure ({departureTrips.length}{" "}
-                {departureTrips.length === 1 ? "leg" : "legs"})
-              </TabsTrigger>
-              <TabsTrigger value="return">
-                Return ({returnTrips.length}{" "}
-                {returnTrips.length === 1 ? "leg" : "legs"})
-              </TabsTrigger>
-            </TabsList>
+          {/* Trip Details */}
+          {hasReturn ? (
+            <Tabs defaultValue="departure">
+              <TabsList>
+                <TabsTrigger value="departure">
+                  Departure ({departureTrips.length}{" "}
+                  {departureTrips.length === 1 ? "leg" : "legs"})
+                </TabsTrigger>
+                <TabsTrigger value="return">
+                  Return ({returnTrips.length}{" "}
+                  {returnTrips.length === 1 ? "leg" : "legs"})
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="departure" className="mt-4 space-y-4">
+              <TabsContent value="departure" className="mt-4 space-y-4">
+                {departureTrips.map((trip, i) => (
+                  <TripCard
+                    key={trip.id}
+                    trip={trip}
+                    label={`Departure${departureTrips.length > 1 ? ` Leg ${i + 1}` : ""}`}
+                  />
+                ))}
+              </TabsContent>
+
+              <TabsContent value="return" className="mt-4 space-y-4">
+                {returnTrips.map((trip, i) => (
+                  <TripCard
+                    key={trip.id}
+                    trip={trip}
+                    label={`Return${returnTrips.length > 1 ? ` Leg ${i + 1}` : ""}`}
+                  />
+                ))}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="space-y-4">
               {departureTrips.map((trip, i) => (
                 <TripCard
                   key={trip.id}
@@ -552,82 +612,83 @@ export default function BookingDetailPage() {
                   label={`Departure${departureTrips.length > 1 ? ` Leg ${i + 1}` : ""}`}
                 />
               ))}
-            </TabsContent>
-
-            <TabsContent value="return" className="mt-4 space-y-4">
-              {returnTrips.map((trip, i) => (
-                <TripCard
-                  key={trip.id}
-                  trip={trip}
-                  label={`Return${returnTrips.length > 1 ? ` Leg ${i + 1}` : ""}`}
-                />
-              ))}
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <div className="space-y-4">
-            {departureTrips.map((trip, i) => (
-              <TripCard
-                key={trip.id}
-                trip={trip}
-                label={`Departure${departureTrips.length > 1 ? ` Leg ${i + 1}` : ""}`}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Payments */}
-        <PaymentSection payments={booking.payments} />
-
-        {/* Booking Metadata */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Booking Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">Booking ID</span>
-                <p className="font-mono text-xs mt-1">{booking.id}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Type</span>
-                <p className="mt-1">{booking.booking_type}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Source</span>
-                <p className="mt-1">{booking.source}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Payment Status</span>
-                <p className="mt-1">
-                  <Badge
-                    variant={statusVariant(booking.payment_status ?? "pending")}
-                  >
-                    {booking.payment_status ?? "Pending"}
-                  </Badge>
-                </p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Ship(s)</span>
-                <p className="mt-1">{booking.ships_used ?? "—"}</p>
-              </div>
-              {booking.remarks && (
-                <div>
-                  <span className="text-muted-foreground">Remarks</span>
-                  <p className="mt-1">{booking.remarks}</p>
-                </div>
-              )}
-              {booking.issued_by && (
-                <div>
-                  <span className="text-muted-foreground">Issued By</span>
-                  <p className="mt-1">{booking.issued_by}</p>
-                </div>
-              )}
             </div>
-          </CardContent>
-        </Card>
+          )}
+
+          {/* Payments */}
+          <PaymentSection payments={booking.payments} />
+
+          {/* Booking Metadata */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Booking Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Booking ID</span>
+                  <p className="font-mono text-xs mt-1">{booking.id}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Type</span>
+                  <p className="mt-1">{booking.booking_type}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Source</span>
+                  <p className="mt-1">{booking.source}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Payment Status</span>
+                  <p className="mt-1">
+                    <Badge
+                      variant={statusVariant(
+                        booking.payment_status ?? "pending",
+                      )}
+                    >
+                      {booking.payment_status ?? "Pending"}
+                    </Badge>
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Ship(s)</span>
+                  <p className="mt-1">{booking.ships_used ?? "—"}</p>
+                </div>
+                {booking.remarks && (
+                  <div>
+                    <span className="text-muted-foreground">Remarks</span>
+                    <p className="mt-1">{booking.remarks}</p>
+                  </div>
+                )}
+                {booking.issued_by && (
+                  <div>
+                    <span className="text-muted-foreground">Issued By</span>
+                    <p className="mt-1">{booking.issued_by}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+
+      <InvalidateModal
+        open={invalidateOpen}
+        onOpenChange={setInvalidateOpen}
+        bookingId={bookingId}
+        booking={booking}
+      />
+      <RefundModal
+        open={refundOpen}
+        onOpenChange={setRefundOpen}
+        bookingId={bookingId}
+        booking={booking}
+      />
+      <RebookModal
+        open={rebookOpen}
+        onOpenChange={setRebookOpen}
+        bookingId={bookingId}
+        booking={booking}
+      />
+    </>
   );
 }

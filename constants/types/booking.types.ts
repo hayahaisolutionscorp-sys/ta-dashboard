@@ -176,6 +176,8 @@ export interface BookingView {
   total_cargo_items?: string;
   total_price?: string;
   price_without_markup?: string;
+  ta_markup?: string;
+  bir_invoice_no?: string;
   payment_status?: string;
   payment_status_raw?: string;
   payment_date?: string;
@@ -404,9 +406,11 @@ export interface ChargeDetail {
   calcType: string;
   basis: string;
   showOnReceipt: boolean;
+  service_domain: string;
 }
 
 export interface CalculatePricingResponse {
+  snapshotId?: number;
   passengerPrices: PassengerPriceDetail[];
   cargoPrices: CargoPriceDetail[];
   baseFare: { passengers: number; cargo: number; total: number };
@@ -415,4 +419,34 @@ export interface CalculatePricingResponse {
   taxesTotal: number;
   subtotal: number;
   grandTotal: number;
+}
+
+// ==================== Bulk Action Types ====================
+
+export interface TripSelection {
+  tripId: string;
+  passengerIds: string[];
+  vehicleIds: string[];
+}
+
+export interface BulkInvalidateRequest {
+  selectedPassengerIds?: string[];
+  selectedVehicleIds?: string[];
+  remarks: string;
+  reasonType?: string;
+  tripSelections?: TripSelection[];
+}
+
+export interface BulkRefundRequest {
+  selectedPassengerIds?: string[];
+  selectedVehicleIds?: string[];
+  remarks: string;
+  reasonType?: string;
+  tripSelections?: TripSelection[];
+}
+
+export interface BulkRebookRequest {
+  passengerIds?: string[];
+  cargoIds?: string[];
+  newBookingData: Record<string, unknown>;
 }

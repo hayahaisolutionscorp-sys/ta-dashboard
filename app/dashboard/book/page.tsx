@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   IconUsers,
@@ -31,6 +31,13 @@ export default function BookTripPage() {
   const [vehicleCount, setVehicleCount] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
+
+  // Round-trip state
+  const [returnDate, setReturnDate] = useState("");
+  const [selectedReturnTripIds, setSelectedReturnTripIds] = useState<string[]>(
+    [],
+  );
+  const [hasSearchedReturn, setHasSearchedReturn] = useState(false);
 
   // Fetch routes for the current user's travel agency
   const { data: routes, isLoading: routesLoading } = useRoutes();
@@ -68,12 +75,20 @@ export default function BookTripPage() {
       }));
   }, [routes, originCode]);
 
-  // Fetch available dates once origin + destination are selected
+  // Fetch available dates for departure (origin → destination)
   const { data: availableDates, isLoading: datesLoading } = useAvailableDates(
     originCode.toUpperCase(),
     destinationCode.toUpperCase(),
   );
 
+  // Fetch available dates for return (destination → origin, swapped)
+  const { data: returnAvailableDates, isLoading: returnDatesLoading } =
+    useAvailableDates(
+      destinationCode.toUpperCase(),
+      originCode.toUpperCase(),
+    );
+
+  // Departure trips query
   const query: AvailableTripsQuery | null =
     hasSearched && originCode && destinationCode && departureDate
       ? {
@@ -91,11 +106,48 @@ export default function BookTripPage() {
     error,
   } = useAvailableTrips(query, hasSearched);
 
+  // Return trips query (swapped origin/destination — marketplace pattern)
+  const returnQuery: AvailableTripsQuery | null =
+    hasSearchedReturn && originCode && destinationCode && returnDate
+      ? {
+          origin_code: destinationCode.toUpperCase(),
+          destination_code: originCode.toUpperCase(),
+          departure_date: returnDate,
+          passenger_count: passengerCount,
+          vehicle_count: vehicleCount,
+        }
+      : null;
+
+  const {
+    data: returnTripsData,
+    isLoading: returnLoading,
+    error: returnError,
+  } = useAvailableTrips(returnQuery, hasSearchedReturn);
+
+  // Clear return date if departure date moves past it
+  useEffect(() => {
+    if (returnDate && departureDate && returnDate < departureDate) {
+      setReturnDate("");
+      setHasSearchedReturn(false);
+      setSelectedReturnTripIds([]);
+    }
+  }, [departureDate, returnDate]);
+
+  const resetReturnState = () => {
+    setReturnDate("");
+    setHasSearchedReturn(false);
+    setSelectedReturnTripIds([]);
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (originCode && destinationCode && departureDate) {
       setHasSearched(true);
       setSelectedTripIds([]);
+      if (tripType === "round-trip" && returnDate) {
+        setHasSearchedReturn(true);
+        setSelectedReturnTripIds([]);
+      }
     }
   };
 
@@ -106,12 +158,31 @@ export default function BookTripPage() {
       setHasSearched(false);
       setSelectedTripIds([]);
     }
+    resetReturnState();
+  };
+
+  const handleDestinationSelect = (portCode: string) => {
+    setDestinationCode(portCode);
+    resetReturnState();
+  };
+
+  const handleTripTypeChange = (type: "one-way" | "round-trip") => {
+    setTripType(type);
+    if (type === "one-way") {
+      resetReturnState();
+    }
   };
 
   const handleDateSelect = (date: string) => {
     setDepartureDate(date);
     setHasSearched(true);
     setSelectedTripIds([]);
+  };
+
+  const handleReturnDateSelect = (date: string) => {
+    setReturnDate(date);
+    setHasSearchedReturn(true);
+    setSelectedReturnTripIds([]);
   };
 
   const handleTripSelect = (tripId: string) => {
@@ -122,12 +193,30 @@ export default function BookTripPage() {
     );
   };
 
+  const handleReturnTripSelect = (tripId: string) => {
+    setSelectedReturnTripIds((prev) =>
+      prev.includes(tripId)
+        ? prev.filter((id) => id !== tripId)
+        : [...prev, tripId],
+    );
+  };
+
   const handleContinue = () => {
     if (selectedTripIds.length === 0) return;
+    if (tripType === "round-trip" && selectedReturnTripIds.length === 0) return;
+
     const params = new URLSearchParams();
     params.set("departure", selectedTripIds.join(","));
+    if (tripType === "round-trip" && selectedReturnTripIds.length > 0) {
+      params.set("return", selectedReturnTripIds.join(","));
+    }
     router.push(`/dashboard/book/create?${params.toString()}`);
   };
+
+  const isRoundTrip = tripType === "round-trip";
+  const canContinue =
+    selectedTripIds.length > 0 &&
+    (!isRoundTrip || selectedReturnTripIds.length > 0);
 
   return (
     <div className="flex flex-1 flex-col min-w-0">
@@ -161,7 +250,7 @@ export default function BookTripPage() {
                     type="radio"
                     className="sr-only"
                     checked={tripType === "one-way"}
-                    onChange={() => setTripType("one-way")}
+                    onChange={() => handleTripTypeChange("one-way")}
                   />
                   <span className="text-sm">One Way</span>
                 </label>
@@ -181,14 +270,18 @@ export default function BookTripPage() {
                     type="radio"
                     className="sr-only"
                     checked={tripType === "round-trip"}
-                    onChange={() => setTripType("round-trip")}
+                    onChange={() => handleTripTypeChange("round-trip")}
                   />
                   <span className="text-sm">Round Trip</span>
                 </label>
               </div>
 
-              {/* Port + Date — stacks on mobile, 3 cols on md+ */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 sm:gap-4">
+              {/* Port + Date — stacks on mobile, expands on md+ */}
+              <div
+                className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${
+                  isRoundTrip ? "md:grid-cols-4" : "md:grid-cols-3"
+                } sm:gap-4`}
+              >
                 {/* From */}
                 <div className="space-y-1">
                   <Label
@@ -219,14 +312,16 @@ export default function BookTripPage() {
                     id="destination"
                     options={destinationOptions}
                     value={destinationCode}
-                    onSelect={(code) => setDestinationCode(code)}
+                    onSelect={(code) => handleDestinationSelect(code)}
                     placeholder="Destination port"
                     disabled={!originCode || routesLoading}
                   />
                 </div>
 
                 {/* Departure Date */}
-                <div className="space-y-1 sm:col-span-2 md:col-span-1">
+                <div
+                  className={`space-y-1 ${!isRoundTrip ? "sm:col-span-2 md:col-span-1" : ""}`}
+                >
                   <Label
                     htmlFor="date"
                     className="text-xs text-muted-foreground"
@@ -241,6 +336,26 @@ export default function BookTripPage() {
                     onChange={(e) => setDepartureDate(e.target.value)}
                   />
                 </div>
+
+                {/* Return Date — only when round-trip */}
+                {isRoundTrip && (
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="return-date"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Return
+                    </Label>
+                    <input
+                      id="return-date"
+                      type="date"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base sm:text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      value={returnDate}
+                      min={departureDate}
+                      onChange={(e) => setReturnDate(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Passengers + Vehicles — stacks on mobile */}
@@ -303,7 +418,12 @@ export default function BookTripPage() {
                 type="submit"
                 size="lg"
                 className="w-full sm:w-auto sm:ml-auto sm:flex bg-blue-500 hover:bg-blue-600 text-white px-8"
-                disabled={!originCode || !destinationCode || !departureDate}
+                disabled={
+                  !originCode ||
+                  !destinationCode ||
+                  !departureDate ||
+                  (isRoundTrip && !returnDate)
+                }
               >
                 Search Trips
               </Button>
@@ -311,9 +431,10 @@ export default function BookTripPage() {
           </CardContent>
         </Card>
 
-        {/* Available Dates — shown once origin + destination are selected */}
+        {/* Departure Available Dates */}
         {originCode && destinationCode && (
           <AvailableDates
+            title={isRoundTrip ? "Departure Dates" : "Available Dates"}
             dates={availableDates ?? []}
             isLoading={datesLoading}
             selectedDate={departureDate}
@@ -321,9 +442,21 @@ export default function BookTripPage() {
           />
         )}
 
-        {/* Trip Results */}
+        {/* Return Available Dates — only when round-trip */}
+        {isRoundTrip && originCode && destinationCode && (
+          <AvailableDates
+            title="Return Dates"
+            dates={returnAvailableDates ?? []}
+            isLoading={returnDatesLoading}
+            selectedDate={returnDate}
+            onDateSelect={handleReturnDateSelect}
+          />
+        )}
+
+        {/* Departure Trip Results */}
         {hasSearched && (
           <TripResults
+            title={isRoundTrip ? "Departure Trips" : "Available Trips"}
             trips={tripsData?.data || []}
             total={tripsData?.total || 0}
             isLoading={isLoading}
@@ -333,8 +466,21 @@ export default function BookTripPage() {
           />
         )}
 
+        {/* Return Trip Results — only when round-trip */}
+        {isRoundTrip && hasSearchedReturn && (
+          <TripResults
+            title="Return Trips"
+            trips={returnTripsData?.data || []}
+            total={returnTripsData?.total || 0}
+            isLoading={returnLoading}
+            error={returnError}
+            selectedTripIds={selectedReturnTripIds}
+            onTripSelect={handleReturnTripSelect}
+          />
+        )}
+
         {/* Continue Button — full width on mobile, sticky at bottom */}
-        {selectedTripIds.length > 0 && (
+        {canContinue && (
           <div className="sticky bottom-3 sm:static sm:flex sm:justify-end">
             <Button
               onClick={handleContinue}

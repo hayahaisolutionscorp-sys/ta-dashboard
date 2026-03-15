@@ -10,6 +10,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IconTrash, IconPackage } from "@tabler/icons-react";
+import { Checkbox } from "@/components/ui/checkbox";
+
+interface TripInfo {
+  id?: string;
+  tripId?: string;
+  tripType: "departure" | "return";
+  sequence: number;
+}
 
 interface LooseCargo {
   description: string;
@@ -29,6 +37,7 @@ interface ClassOption {
 interface LooseCargosSectionProps {
   cargos: LooseCargo[];
   cargoClasses: ClassOption[];
+  trips: TripInfo[];
   isPricingLoading?: boolean;
   onRemove: (index: number) => void;
   onUpdate: (index: number, field: string, value: unknown) => void;
@@ -37,10 +46,13 @@ interface LooseCargosSectionProps {
 export default function LooseCargosSection({
   cargos,
   cargoClasses,
+  trips,
   isPricingLoading,
   onRemove,
   onUpdate,
 }: LooseCargosSectionProps) {
+  const hasReturnTrip = trips.some((t) => t.tripType === "return");
+  const returnTrip = trips.find((t) => t.tripType === "return");
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -161,6 +173,33 @@ export default function LooseCargosSection({
                 </div>
               )}
             </div>
+
+            {/* Include in return trip toggle */}
+            {hasReturnTrip && returnTrip && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={cargo.tripAssignments.some(
+                    (a) => a.tripId === (returnTrip.id ?? returnTrip.tripId),
+                  )}
+                  onCheckedChange={(checked) => {
+                    const returnTripId = returnTrip.id ?? returnTrip.tripId;
+                    if (!returnTripId) return;
+                    const updated = checked
+                      ? [
+                          ...cargo.tripAssignments,
+                          { tripId: returnTripId },
+                        ]
+                      : cargo.tripAssignments.filter(
+                          (a) => a.tripId !== returnTripId,
+                        );
+                    onUpdate(index, "tripAssignments", updated);
+                  }}
+                />
+                <span className="text-xs text-gray-600">
+                  Include in return trip
+                </span>
+              </label>
+            )}
           </div>
         ))}
       </div>

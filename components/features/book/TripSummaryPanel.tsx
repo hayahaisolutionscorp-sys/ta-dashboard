@@ -7,6 +7,7 @@ import type {
   PreparedBookingData,
   BookingFormTrip,
   CalculatePricingRequest,
+  ChargeDetail,
 } from "@/constants/types/booking.types";
 import type { BookingFormData } from "@/lib/validators/booking.validators";
 import { usePricingCalculation } from "@/hooks/mutations/bookings/use-pricing-calculation";
@@ -27,13 +28,47 @@ interface TripSummaryPanelProps {
   allTrips: BookingFormTrip[];
   formData?: BookingFormData;
   onPricingLoadingChange?: (isLoading: boolean) => void;
+  onSnapshotId?: (snapshotId: number) => void;
+}
+
+interface PassengerLine {
+  label: string;
+  type: string;
+  cabin: string;
+  amount: number;
+}
+
+interface VehicleLine {
+  label: string;
+  classCode: string;
+  amount: number;
+}
+
+interface CargoLine {
+  label: string;
+  classCode: string;
+  quantity: number;
+  amount: number;
+}
+
+interface TripPricingGroup {
+  tripType: "departure" | "return";
+  tripLabel: string;
+  passengers: PassengerLine[];
+  vehicles: VehicleLine[];
+  cargos: CargoLine[];
+  passengerCharges: ChargeDetail[];
+  vehicleCharges: ChargeDetail[];
+  cargoCharges: ChargeDetail[];
 }
 
 export default function TripSummaryPanel({
   allTrips,
   formData,
   onPricingLoadingChange,
+  onSnapshotId,
 }: TripSummaryPanelProps) {
+
   const formatDateTime = (dateStr?: string): string => {
     if (!dateStr) return "—";
     const d = new Date(dateStr);
@@ -52,6 +87,7 @@ export default function TripSummaryPanel({
 
   const departureTrips = allTrips.filter((t) => t.tripType === "departure");
   const returnTrips = allTrips.filter((t) => t.tripType === "return");
+  const isRoundTrip = returnTrips.length > 0;
 
   // Build the pricing API request from form data
   const pricingRequest: CalculatePricingRequest | null = useMemo(() => {
@@ -72,7 +108,6 @@ export default function TripSummaryPanel({
 
     if (!hasItems) return null;
 
-    // Map passengers to pricing input
     const passengers = (formData.passengers ?? []).map((pax, idx) => ({
       index: idx,
       passengerType: pax.tripAssignments?.at(0)?.discountType ?? "Adult",
@@ -83,7 +118,6 @@ export default function TripSummaryPanel({
       })),
     }));
 
-    // Map vehicles and loose cargos to cargo pricing inputs
     const cargos = [
       ...(formData.vehicles ?? []).map((veh, idx) => ({
         index: idx,
@@ -120,7 +154,6 @@ export default function TripSummaryPanel({
     return request;
   }, [formData, allTrips]);
 
-  // Call the pricing API
   const {
     data: pricing,
     isLoading: isPricingLoading,
@@ -129,126 +162,185 @@ export default function TripSummaryPanel({
     request: pricingRequest,
   });
 
-  // Notify parent when pricing loading state changes
   useEffect(() => {
     onPricingLoadingChange?.(isPricingLoading || isPricingFetching);
   }, [isPricingLoading, isPricingFetching, onPricingLoadingChange]);
 
-  // Deep debug: log every time pricing changes
   useEffect(() => {
     console.log("[TripSummaryPanel] === PRICING DATA CHANGED ===");
     console.log("[TripSummaryPanel] pricing:", pricing);
-    console.log("[TripSummaryPanel] pricing type:", typeof pricing);
     if (pricing) {
       console.log("[TripSummaryPanel] pricing keys:", Object.keys(pricing));
-      console.log(
-        "[TripSummaryPanel] passengerPrices:",
-        JSON.stringify(pricing.passengerPrices),
-      );
-      console.log(
-        "[TripSummaryPanel] cargoPrices:",
-        JSON.stringify(pricing.cargoPrices),
-      );
+      console.log("[TripSummaryPanel] passengerPrices:", JSON.stringify(pricing.passengerPrices));
+      console.log("[TripSummaryPanel] cargoPrices:", JSON.stringify(pricing.cargoPrices));
       console.log("[TripSummaryPanel] grandTotal:", pricing.grandTotal);
     }
-    console.log("[TripSummaryPanel] isPricingLoading:", isPricingLoading);
   }, [pricing, isPricingLoading]);
 
-  // Build display data from pricing response
-  const passengerLines = useMemo(() => {
-    if (!formData?.passengers) return [];
+  useEffect(() => {
+    if (pricing?.snapshotId) {
+      onSnapshotId?.(pricing.snapshotId);
+    }
+  }, [pricing?.snapshotId, onSnapshotId]);
 
-    return formData.passengers.map((pax, idx) => {
-      const firstName = pax.firstName || `Passenger ${idx + 1}`;
-      const assignment = pax.tripAssignments?.at(0);
-      const discountType = assignment?.discountType || "Adult";
-      const cabinId = assignment?.cabinId ?? null;
+  // Categorize charges by service_domain / basis
+  const categorizedCharges = useMemo(() => {
+    const visible = (pricing?.charges ?? []).filter(
+      (c) => !c.isInclusive && c.showOnReceipt,
+    );
+    const passenger: ChargeDetail[] = [];
+    const vehicle: ChargeDetail[] = [];
+    const cargo: ChargeDetail[] = [];
+    const other: ChargeDetail[] = [];
 
-      // Find cabin name
-      let cabinName = "";
-      if (cabinId) {
-        for (const trip of allTrips) {
-          const cabin = trip.cabins?.find((c) => c.id === cabinId);
-          if (cabin) {
-            cabinName = cabin.name;
-            break;
+    for (const charge of visible) {
+      const domain = charge.service_domain?.toUpperCase();
+      const basis = charge.basis?.toUpperCase();
+
+      if (domain === "PASSENGER" || basis === "PER_PAX") {
+        passenger.push(charge);
+      } else if (domain === "VEHICLE") {
+        vehicle.push(charge);
+      } else if (domain === "CARGO" || basis === "PER_CARGO") {
+        cargo.push(charge);
+      } else {
+        other.push(charge);
+      }
+    }
+    return { passenger, vehicle, cargo, other };
+  }, [pricing?.charges]);
+
+  // Build per-trip pricing groups
+  const tripPricingGroups: TripPricingGroup[] = useMemo(() => {
+    if (!formData) return [];
+
+    // Helper: get trip IDs for a trip type
+    const getTripIds = (tripType: "departure" | "return") =>
+      allTrips.filter((t) => t.tripType === tripType).map((t) => t.id);
+
+    const departureTripIds = new Set(getTripIds("departure"));
+    const returnTripIds = new Set(getTripIds("return"));
+
+    const buildGroup = (
+      tripType: "departure" | "return",
+      tripIds: Set<string>,
+      label: string,
+    ): TripPricingGroup => {
+      // Passengers for this leg
+      const passengers: PassengerLine[] = (formData.passengers ?? []).map((pax, idx) => {
+        const firstName = pax.firstName || `Passenger ${idx + 1}`;
+        // Find the trip assignment for this leg
+        const assignment = pax.tripAssignments?.find((ta) => tripIds.has(ta.tripId));
+        const discountType = assignment?.discountType || pax.tripAssignments?.at(0)?.discountType || "Adult";
+        const cabinId = assignment?.cabinId ?? null;
+
+        let cabinName = "";
+        if (cabinId) {
+          for (const trip of allTrips) {
+            if (!tripIds.has(trip.id)) continue;
+            const cabin = trip.cabins?.find((c) => c.id === cabinId);
+            if (cabin) {
+              cabinName = cabin.name;
+              break;
+            }
           }
         }
-      }
 
-      // Sum up all trip prices for this passenger from the pricing response
-      const amount =
-        pricing?.passengerPrices
-          ?.filter((p) => p.index === idx)
-          .reduce((sum, p) => sum + p.baseFare, 0) ?? 0;
+        const amount =
+          pricing?.passengerPrices
+            ?.filter((p) => p.index === idx && tripIds.has(p.tripId))
+            .reduce((sum, p) => sum + p.baseFare, 0) ?? 0;
 
-      return { label: firstName, type: discountType, cabin: cabinName, amount };
-    });
-  }, [formData, pricing?.passengerPrices, allTrips]);
+        return { label: firstName, type: discountType, cabin: cabinName, amount };
+      });
 
-  const vehicleLines = useMemo(() => {
-    if (!formData?.vehicles) return [];
+      // Vehicles for this leg
+      const vehicles: VehicleLine[] = (formData.vehicles ?? [])
+        .map((veh, idx) => {
+          const isAssigned = veh.tripAssignments?.some((ta) => tripIds.has(ta.tripId));
+          if (!isAssigned) return null;
 
-    console.log(
-      "[TripSummaryPanel] vehicleLines computing. vehicles:",
-      formData.vehicles.length,
-      "cargoPrices:",
-      pricing?.cargoPrices,
-    );
+          const label = veh.plateNumber || `Vehicle ${idx + 1}`;
+          const classCode = veh.cargoClassCode || "—";
+          const amount =
+            pricing?.cargoPrices
+              ?.filter((c) => c.index === idx && c.cargoType === "rolling" && tripIds.has(c.tripId))
+              .reduce((sum, c) => sum + c.baseFare, 0) ?? 0;
 
-    return formData.vehicles.map((veh, idx) => {
-      const label = veh.plateNumber || `Vehicle ${idx + 1}`;
-      const classCode = veh.cargoClassCode || "—";
+          return { label, classCode, amount };
+        })
+        .filter((v): v is VehicleLine => v !== null);
 
-      const matchingPrices = pricing?.cargoPrices?.filter(
-        (c) => c.index === idx && c.cargoType === "rolling",
-      );
-      console.log(
-        `[TripSummaryPanel] Vehicle ${idx}: matchingPrices=`,
-        matchingPrices,
-      );
+      // Loose cargo for this leg
+      const vehicleCount = formData.vehicles?.length ?? 0;
+      const cargos: CargoLine[] = (formData.looseCargos ?? [])
+        .map((cargo, idx) => {
+          const isAssigned = cargo.tripAssignments?.some((ta) => tripIds.has(ta.tripId));
+          if (!isAssigned) return null;
 
-      const amount =
-        matchingPrices?.reduce((sum, c) => sum + c.baseFare, 0) ?? 0;
+          const label = cargo.description || `Cargo ${idx + 1}`;
+          const classCode = cargo.cargoClassCode || "—";
+          const qty = cargo.quantity ?? 1;
+          const cargoIdx = vehicleCount + idx;
+          const amount =
+            pricing?.cargoPrices
+              ?.filter((c) => c.index === cargoIdx && c.cargoType === "loose" && tripIds.has(c.tripId))
+              .reduce((sum, c) => sum + c.baseFare, 0) ?? 0;
 
-      return { label, classCode, amount };
-    });
-  }, [formData, pricing?.cargoPrices]);
+          return { label, classCode, quantity: qty, amount };
+        })
+        .filter((c): c is CargoLine => c !== null);
 
-  const cargoLines = useMemo(() => {
-    if (!formData?.looseCargos) return [];
+      // For charges: in round trip, split evenly between legs
+      // (charges are totals, not per-trip, so we divide by trip count)
+      const tripCount = isRoundTrip ? 2 : 1;
+      const splitCharge = (charge: ChargeDetail): ChargeDetail => ({
+        ...charge,
+        amount: charge.amount / tripCount,
+      });
 
-    const vehicleCount = formData.vehicles?.length ?? 0;
+      return {
+        tripType,
+        tripLabel: label,
+        passengers,
+        vehicles,
+        cargos,
+        passengerCharges: categorizedCharges.passenger.map(splitCharge),
+        vehicleCharges: categorizedCharges.vehicle.map(splitCharge),
+        cargoCharges: categorizedCharges.cargo.map(splitCharge),
+      };
+    };
 
-    return formData.looseCargos.map((cargo, idx) => {
-      const label = cargo.description || `Cargo ${idx + 1}`;
-      const classCode = cargo.cargoClassCode || "—";
-      const qty = cargo.quantity ?? 1;
+    if (!isRoundTrip) {
+      // Single trip — one group, no label needed
+      return [buildGroup("departure", departureTripIds, "")];
+    }
 
-      const cargoIdx = vehicleCount + idx;
-      const amount =
-        pricing?.cargoPrices
-          ?.filter((c) => c.index === cargoIdx && c.cargoType === "loose")
-          .reduce((sum, c) => sum + c.baseFare, 0) ?? 0;
+    return [
+      buildGroup("departure", departureTripIds, "Departure"),
+      buildGroup("return", returnTripIds, "Return"),
+    ];
+  }, [formData, pricing, allTrips, isRoundTrip, categorizedCharges]);
 
-      return { label, classCode, quantity: qty, amount };
-    });
-  }, [formData, pricing?.cargoPrices]);
+  // Compute totals
+  const grandTotalFromGroups = tripPricingGroups.reduce((total, group) => {
+    const paxTotal = group.passengers.reduce((s, l) => s + l.amount, 0);
+    const vehTotal = group.vehicles.reduce((s, l) => s + l.amount, 0);
+    const crgTotal = group.cargos.reduce((s, l) => s + l.amount, 0);
+    const paxCharges = group.passengerCharges.reduce((s, c) => s + c.amount, 0);
+    const vehCharges = group.vehicleCharges.reduce((s, c) => s + c.amount, 0);
+    const crgCharges = group.cargoCharges.reduce((s, c) => s + c.amount, 0);
+    return total + paxTotal + vehTotal + crgTotal + paxCharges + vehCharges + crgCharges;
+  }, 0);
 
-  const passengerTotal = passengerLines.reduce((s, l) => s + l.amount, 0);
-  const vehicleTotal = vehicleLines.reduce((s, l) => s + l.amount, 0);
-  const cargoTotal = cargoLines.reduce((s, l) => s + l.amount, 0);
+  const otherChargesTotal = categorizedCharges.other.reduce((s, c) => s + c.amount, 0);
 
-  const hasItems =
-    passengerLines.length > 0 ||
-    vehicleLines.length > 0 ||
-    cargoLines.length > 0;
+  const hasItems = tripPricingGroups.some(
+    (g) => g.passengers.length > 0 || g.vehicles.length > 0 || g.cargos.length > 0,
+  );
 
   const markupAmount = formData?.ta_markup ?? 0;
-
-  // Use the grand total from pricing API if available, otherwise sum base fares
-  const baseTotal =
-    pricing?.grandTotal ?? passengerTotal + vehicleTotal + cargoTotal;
+  const baseTotal = pricing?.grandTotal ?? (grandTotalFromGroups + otherChargesTotal);
   const grandTotal = baseTotal + markupAmount;
 
   return (
@@ -308,116 +400,176 @@ export default function TripSummaryPanel({
               )}
             </div>
 
-            {/* Passengers */}
-            {passengerLines.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700">
-                  <IconUser className="h-3 w-3" />
-                  <span>Passengers</span>
-                </div>
-                {passengerLines.map((line, idx) => (
-                  <div
-                    key={`pax-${idx}`}
-                    className="flex items-center justify-between text-xs pl-4"
-                  >
-                    <div className="flex items-center gap-1 min-w-0 truncate">
-                      <span className="truncate">{line.label}</span>
-                      <span className="text-gray-400 shrink-0">
-                        ({line.type}
-                        {line.cabin ? `, ${line.cabin}` : ""})
-                      </span>
-                    </div>
-                    <span className="font-medium shrink-0 ml-2">
-                      {line.amount > 0 ? formatCurrency(line.amount) : "—"}
-                    </span>
-                  </div>
-                ))}
-                <div className="flex justify-between text-xs font-medium pl-4 text-blue-700">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(passengerTotal)}</span>
-                </div>
-              </div>
-            )}
+            {tripPricingGroups.map((group, groupIdx) => {
+              const paxBaseFare = group.passengers.reduce((s, l) => s + l.amount, 0);
+              const paxChargesAmt = group.passengerCharges.reduce((s, c) => s + c.amount, 0);
+              const paxSubtotal = paxBaseFare + paxChargesAmt;
 
-            {/* Vehicles */}
-            {vehicleLines.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-purple-700">
-                  <IconCar className="h-3 w-3" />
-                  <span>Vehicles</span>
-                </div>
-                {vehicleLines.map((line, idx) => (
-                  <div
-                    key={`veh-${idx}`}
-                    className="flex items-center justify-between text-xs pl-4"
-                  >
-                    <div className="flex items-center gap-1 min-w-0 truncate">
-                      <span className="truncate">{line.label}</span>
-                      <span className="text-gray-400 shrink-0">
-                        ({line.classCode})
-                      </span>
-                    </div>
-                    <span className="font-medium shrink-0 ml-2">
-                      {line.amount > 0 ? formatCurrency(line.amount) : "—"}
-                    </span>
-                  </div>
-                ))}
-                <div className="flex justify-between text-xs font-medium pl-4 text-purple-700">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(vehicleTotal)}</span>
-                </div>
-              </div>
-            )}
+              const vehBaseFare = group.vehicles.reduce((s, l) => s + l.amount, 0);
+              const vehChargesAmt = group.vehicleCharges.reduce((s, c) => s + c.amount, 0);
+              const vehSubtotal = vehBaseFare + vehChargesAmt;
 
-            {/* Cargos */}
-            {cargoLines.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
-                  <IconPackage className="h-3 w-3" />
-                  <span>Cargo</span>
-                </div>
-                {cargoLines.map((line, idx) => (
-                  <div
-                    key={`crg-${idx}`}
-                    className="flex items-center justify-between text-xs pl-4"
-                  >
-                    <div className="flex items-center gap-1 min-w-0 truncate">
-                      <span className="truncate">{line.label}</span>
-                      <span className="text-gray-400 shrink-0">
-                        (×{line.quantity}, {line.classCode})
-                      </span>
-                    </div>
-                    <span className="font-medium shrink-0 ml-2">
-                      {line.amount > 0 ? formatCurrency(line.amount) : "—"}
-                    </span>
-                  </div>
-                ))}
-                <div className="flex justify-between text-xs font-medium pl-4 text-amber-700">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(cargoTotal)}</span>
-                </div>
-              </div>
-            )}
+              const crgBaseFare = group.cargos.reduce((s, l) => s + l.amount, 0);
+              const crgChargesAmt = group.cargoCharges.reduce((s, c) => s + c.amount, 0);
+              const crgSubtotal = crgBaseFare + crgChargesAmt;
 
-            {/* Charges breakdown (if any) */}
-            {pricing?.charges && pricing.charges.length > 0 && (
+              return (
+                <div key={`group-${groupIdx}`} className="space-y-2">
+                  {/* Group label for round trips */}
+                  {group.tripLabel && (
+                    <div className="flex items-center gap-1.5">
+                      <Badge
+                        variant={group.tripType === "departure" ? "secondary" : "outline"}
+                        className="text-[10px]"
+                      >
+                        {group.tripLabel}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Passengers */}
+                  {group.passengers.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700">
+                        <IconUser className="h-3 w-3" />
+                        <span>Passengers</span>
+                      </div>
+                      {group.passengers.map((line, idx) => (
+                        <div
+                          key={`pax-${groupIdx}-${idx}`}
+                          className="flex items-center justify-between text-xs pl-4"
+                        >
+                          <div className="flex items-center gap-1 min-w-0 truncate">
+                            <span className="truncate">{line.label}</span>
+                            <span className="text-gray-400 shrink-0">
+                              ({line.type}
+                              {line.cabin ? `, ${line.cabin}` : ""})
+                            </span>
+                          </div>
+                          <span className="font-medium shrink-0 ml-2">
+                            {line.amount > 0 ? formatCurrency(line.amount) : "—"}
+                          </span>
+                        </div>
+                      ))}
+                      {group.passengerCharges.map((charge, idx) => (
+                        <div
+                          key={`pax-charge-${groupIdx}-${idx}`}
+                          className="flex items-center justify-between text-xs pl-4"
+                        >
+                          <span className="text-gray-500">{charge.chargeName}</span>
+                          <span className="font-medium">{formatCurrency(charge.amount)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-xs font-medium pl-4 text-blue-700">
+                        <span>Subtotal</span>
+                        <span>{formatCurrency(paxSubtotal)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Vehicles */}
+                  {group.vehicles.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-purple-700">
+                        <IconCar className="h-3 w-3" />
+                        <span>Vehicles</span>
+                      </div>
+                      {group.vehicles.map((line, idx) => (
+                        <div
+                          key={`veh-${groupIdx}-${idx}`}
+                          className="flex items-center justify-between text-xs pl-4"
+                        >
+                          <div className="flex items-center gap-1 min-w-0 truncate">
+                            <span className="truncate">{line.label}</span>
+                            <span className="text-gray-400 shrink-0">
+                              ({line.classCode})
+                            </span>
+                          </div>
+                          <span className="font-medium shrink-0 ml-2">
+                            {line.amount > 0 ? formatCurrency(line.amount) : "—"}
+                          </span>
+                        </div>
+                      ))}
+                      {group.vehicleCharges.map((charge, idx) => (
+                        <div
+                          key={`veh-charge-${groupIdx}-${idx}`}
+                          className="flex items-center justify-between text-xs pl-4"
+                        >
+                          <span className="text-gray-500">{charge.chargeName}</span>
+                          <span className="font-medium">{formatCurrency(charge.amount)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-xs font-medium pl-4 text-purple-700">
+                        <span>Subtotal</span>
+                        <span>{formatCurrency(vehSubtotal)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cargos */}
+                  {group.cargos.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                        <IconPackage className="h-3 w-3" />
+                        <span>Cargo</span>
+                      </div>
+                      {group.cargos.map((line, idx) => (
+                        <div
+                          key={`crg-${groupIdx}-${idx}`}
+                          className="flex items-center justify-between text-xs pl-4"
+                        >
+                          <div className="flex items-center gap-1 min-w-0 truncate">
+                            <span className="truncate">{line.label}</span>
+                            <span className="text-gray-400 shrink-0">
+                              (×{line.quantity}, {line.classCode})
+                            </span>
+                          </div>
+                          <span className="font-medium shrink-0 ml-2">
+                            {line.amount > 0 ? formatCurrency(line.amount) : "—"}
+                          </span>
+                        </div>
+                      ))}
+                      {group.cargoCharges.map((charge, idx) => (
+                        <div
+                          key={`crg-charge-${groupIdx}-${idx}`}
+                          className="flex items-center justify-between text-xs pl-4"
+                        >
+                          <span className="text-gray-500">{charge.chargeName}</span>
+                          <span className="font-medium">{formatCurrency(charge.amount)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-xs font-medium pl-4 text-amber-700">
+                        <span>Subtotal</span>
+                        <span>{formatCurrency(crgSubtotal)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Separator between trip groups */}
+                  {isRoundTrip && groupIdx < tripPricingGroups.length - 1 && (
+                    <Separator className="my-1" />
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Per-booking charges & taxes */}
+            {categorizedCharges.other.length > 0 && (
               <div className="space-y-1">
                 <div className="text-xs font-medium text-gray-500">
                   Charges & Taxes
                 </div>
-                {pricing.charges
-                  .filter((c) => !c.isInclusive && c.showOnReceipt)
-                  .map((charge, idx) => (
-                    <div
-                      key={`charge-${idx}`}
-                      className="flex items-center justify-between text-xs pl-4"
-                    >
-                      <span className="text-gray-500">{charge.chargeName}</span>
-                      <span className="font-medium">
-                        {formatCurrency(charge.amount)}
-                      </span>
-                    </div>
-                  ))}
+                {categorizedCharges.other.map((charge, idx) => (
+                  <div
+                    key={`charge-${idx}`}
+                    className="flex items-center justify-between text-xs pl-4"
+                  >
+                    <span className="text-gray-500">{charge.chargeName}</span>
+                    <span className="font-medium">
+                      {formatCurrency(charge.amount)}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 

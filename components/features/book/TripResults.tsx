@@ -13,6 +13,7 @@ interface TripResultsProps {
   error: Error | null;
   selectedTripIds: string[];
   onTripSelect: (tripId: string) => void;
+  title?: string;
 }
 
 export default function TripResults({
@@ -22,6 +23,7 @@ export default function TripResults({
   error,
   selectedTripIds,
   onTripSelect,
+  title = "Available Trips",
 }: TripResultsProps) {
   if (isLoading) {
     return (
@@ -79,7 +81,7 @@ export default function TripResults({
     <Card>
       <CardHeader className="pb-3 sm:pb-4">
         <CardTitle className="flex items-center justify-between text-base sm:text-lg">
-          <span>Available Trips</span>
+          <span>{title}</span>
           <Badge variant="secondary">{total} found</Badge>
         </CardTitle>
       </CardHeader>

@@ -149,13 +149,38 @@ export default function PassengersSection({
               />
             </div>
 
-            {/* Trip Assignments */}
+            {/* Passenger Type (shared across all trips) */}
+            <div className="bg-gray-50 rounded p-1.5">
+              <Select
+                value={passenger.tripAssignments[0]?.discountType ?? ""}
+                disabled={isPricingLoading}
+                onValueChange={(val) => {
+                  // Sync discount type to ALL trip assignments
+                  const updated = passenger.tripAssignments.map((a) => ({
+                    ...a,
+                    discountType: val,
+                  }));
+                  onUpdate(index, "tripAssignments", updated);
+                }}
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Passenger Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {discountTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Cabin selectors per trip (only when >1 cabin option) */}
             {passenger.tripAssignments.map((assignment, tripIdx) => {
               const trip = trips[tripIdx];
               if (!trip) return null;
 
-              // Deduplicate cabins by name — the ship may have multiple
-              // physical cabins of the same type (e.g. two "Economy" cabins)
               const uniqueCabins = trip.cabins
                 ? Array.from(
                     new Map(
@@ -164,62 +189,44 @@ export default function PassengersSection({
                   )
                 : [];
 
+              if (uniqueCabins.length <= 1) return null;
+
+              const tripLabel =
+                trip.tripType === "return" ? "Return" : "Departure";
+
               return (
                 <div
-                  key={`trip-assign-${tripIdx}`}
-                  className="grid grid-cols-2 gap-2 bg-gray-50 rounded p-1.5"
+                  key={`cabin-${tripIdx}`}
+                  className="bg-gray-50 rounded p-1.5 space-y-1"
                 >
+                  <span className="text-[10px] text-gray-500 font-medium">
+                    {tripLabel} Cabin
+                  </span>
                   <Select
-                    value={assignment.discountType}
+                    value={
+                      assignment.cabinId ? String(assignment.cabinId) : ""
+                    }
                     disabled={isPricingLoading}
                     onValueChange={(val) => {
                       const updated = [...passenger.tripAssignments];
                       updated[tripIdx] = {
                         ...updated[tripIdx],
-                        discountType: val,
+                        cabinId: Number(val),
                       };
                       onUpdate(index, "tripAssignments", updated);
                     }}
                   >
                     <SelectTrigger className="h-7 text-xs">
-                      <SelectValue placeholder="Type" />
+                      <SelectValue placeholder="Cabin" />
                     </SelectTrigger>
                     <SelectContent>
-                      {discountTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
+                      {uniqueCabins.map((cabin) => (
+                        <SelectItem key={cabin.id} value={String(cabin.id)}>
+                          {cabin.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-
-                  {uniqueCabins.length > 1 && (
-                    <Select
-                      value={
-                        assignment.cabinId ? String(assignment.cabinId) : ""
-                      }
-                      disabled={isPricingLoading}
-                      onValueChange={(val) => {
-                        const updated = [...passenger.tripAssignments];
-                        updated[tripIdx] = {
-                          ...updated[tripIdx],
-                          cabinId: Number(val),
-                        };
-                        onUpdate(index, "tripAssignments", updated);
-                      }}
-                    >
-                      <SelectTrigger className="h-7 text-xs">
-                        <SelectValue placeholder="Cabin" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {uniqueCabins.map((cabin) => (
-                          <SelectItem key={cabin.id} value={String(cabin.id)}>
-                            {cabin.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
               );
             })}
