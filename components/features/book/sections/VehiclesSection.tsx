@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { IconTrash, IconCar } from "@tabler/icons-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useBookingFormUiStore } from "@/lib/stores/booking-form-ui.store";
 
 interface TripInfo {
   id?: string;
@@ -47,7 +48,6 @@ interface VehiclesSectionProps {
   vehicleClasses: ClassOption[];
   trips: TripInfo[];
   passengers?: PassengerOption[];
-  isPricingLoading?: boolean;
   onRemove: (index: number) => void;
   onUpdate: (index: number, field: string, value: unknown) => void;
 }
@@ -57,10 +57,10 @@ export default function VehiclesSection({
   vehicleClasses,
   trips,
   passengers = [],
-  isPricingLoading,
   onRemove,
   onUpdate,
 }: VehiclesSectionProps) {
+  const isPricingLoading = useBookingFormUiStore((s) => s.isPricingLoading);
   const hasReturnTrip = trips.some((t) => t.tripType === "return");
   const returnTrip = trips.find((t) => t.tripType === "return");
   return (

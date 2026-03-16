@@ -60,13 +60,39 @@ export function InvalidateModal({
     0,
   );
 
+  const activeCargos = allTrips.reduce(
+    (sum, t) =>
+      sum +
+      (t.cargos ?? t.cargo ?? []).filter(
+        (c) =>
+          !["invalidated", "removed", "cancelled"].includes(
+            (c.bookingStatus ?? c.booking_status ?? "").toLowerCase(),
+          ),
+      ).length,
+    0,
+  );
+
   const handleSubmit = () => {
+    console.log("[Invalidate] Remarks:", remarks);
+    console.log(
+      "[Invalidate] Active items — passengers:",
+      activePassengers,
+      "vehicles:",
+      activeVehicles,
+      "cargos:",
+      activeCargos,
+    );
+
     mutation.mutate(
       { remarks },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          console.log("[Invalidate] Success:", data);
           setRemarks("");
           onOpenChange(false);
+        },
+        onError: (err) => {
+          console.error("[Invalidate] Error:", err);
         },
       },
     );
@@ -85,7 +111,9 @@ export function InvalidateModal({
         <div className="space-y-4">
           <p className="text-sm text-destructive font-medium">
             This will invalidate all active passengers ({activePassengers}) and
-            vehicles ({activeVehicles}) with a 100% refund.
+            vehicles ({activeVehicles})
+            {activeCargos > 0 ? ` and cargo items (${activeCargos})` : ""} with
+            a 100% refund.
           </p>
 
           <div className="space-y-2">

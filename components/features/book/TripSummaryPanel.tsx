@@ -12,8 +12,8 @@
  *    labels them accordingly within each leg block.
  *  - Surfaces the snapshotId from the pricing response to the parent form
  *    via the onSnapshotId callback so rates are locked at submission time.
- *  - Notifies the parent of loading state via onPricingLoadingChange so
- *    pricing-sensitive selects can be disabled while a fetch is in flight.
+ *  - Sets isPricingLoading in useBookingFormUiStore so pricing-sensitive
+ *    selects in sibling section components can be disabled during a fetch.
  */
 "use client";
 
@@ -28,6 +28,7 @@ import type {
 } from "@/constants/types/booking.types";
 import type { BookingFormData } from "@/lib/validators/booking.validators";
 import { usePricingCalculation } from "@/hooks/mutations/bookings/use-pricing-calculation";
+import { useBookingFormUiStore } from "@/lib/stores/booking-form-ui.store";
 import { useMemo } from "react";
 import {
   IconShip,
@@ -44,7 +45,6 @@ interface TripSummaryPanelProps {
   bookingData: PreparedBookingData;
   allTrips: BookingFormTrip[];
   formData?: BookingFormData;
-  onPricingLoadingChange?: (isLoading: boolean) => void;
   onSnapshotId?: (snapshotId: number) => void;
 }
 
@@ -82,9 +82,9 @@ interface TripPricingGroup {
 export default function TripSummaryPanel({
   allTrips,
   formData,
-  onPricingLoadingChange,
   onSnapshotId,
 }: TripSummaryPanelProps) {
+  const setPricingLoading = useBookingFormUiStore((s) => s.setPricingLoading);
 
   const formatDateTime = (dateStr?: string): string => {
     if (!dateStr) return "—";
@@ -175,8 +175,8 @@ export default function TripSummaryPanel({
   });
 
   useEffect(() => {
-    onPricingLoadingChange?.(isPricingLoading || isPricingFetching);
-  }, [isPricingLoading, isPricingFetching, onPricingLoadingChange]);
+    setPricingLoading(isPricingLoading || isPricingFetching);
+  }, [isPricingLoading, isPricingFetching, setPricingLoading]);
 
   useEffect(() => {
     if (pricing?.snapshotId) {

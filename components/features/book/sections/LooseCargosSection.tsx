@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { IconTrash, IconPackage } from "@tabler/icons-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useBookingFormUiStore } from "@/lib/stores/booking-form-ui.store";
 
 interface TripInfo {
   id?: string;
@@ -38,7 +39,6 @@ interface LooseCargosSectionProps {
   cargos: LooseCargo[];
   cargoClasses: ClassOption[];
   trips: TripInfo[];
-  isPricingLoading?: boolean;
   onRemove: (index: number) => void;
   onUpdate: (index: number, field: string, value: unknown) => void;
 }
@@ -47,10 +47,10 @@ export default function LooseCargosSection({
   cargos,
   cargoClasses,
   trips,
-  isPricingLoading,
   onRemove,
   onUpdate,
 }: LooseCargosSectionProps) {
+  const isPricingLoading = useBookingFormUiStore((s) => s.isPricingLoading);
   const hasReturnTrip = trips.some((t) => t.tripType === "return");
   const returnTrip = trips.find((t) => t.tripType === "return");
   return (

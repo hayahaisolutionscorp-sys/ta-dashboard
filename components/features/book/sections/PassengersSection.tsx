@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IconTrash, IconUser } from "@tabler/icons-react";
+import { useBookingFormUiStore } from "@/lib/stores/booking-form-ui.store";
 
 interface TripInfo {
   id?: string;
@@ -43,7 +44,6 @@ interface PassengersSectionProps {
   passengers: Passenger[];
   trips: TripInfo[];
   discountTypes: string[];
-  isPricingLoading?: boolean;
   onRemove: (index: number) => void;
   onUpdate: (index: number, field: string, value: unknown) => void;
 }
@@ -52,10 +52,10 @@ export default function PassengersSection({
   passengers,
   trips,
   discountTypes,
-  isPricingLoading,
   onRemove,
   onUpdate,
 }: PassengersSectionProps) {
+  const isPricingLoading = useBookingFormUiStore((s) => s.isPricingLoading);
   const formatDate = (date: Date): string => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
     const year = date.getFullYear();

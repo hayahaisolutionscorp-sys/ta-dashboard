@@ -23,6 +23,8 @@ import type {
   BookingView,
   BookingTripDetail,
   BookingTripPassengerView,
+  BookingTripVehicleView,
+  BookingTripCargoView,
   TripView,
   AvailableTripsQuery,
 } from "@/constants/types/booking.types";
@@ -70,6 +72,12 @@ export function RebookModal({
   const [selectedPassengerIds, setSelectedPassengerIds] = useState<Set<string>>(
     new Set(),
   );
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [selectedCargoIds, setSelectedCargoIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const mutation = useBulkRebook(bookingId);
@@ -102,6 +110,32 @@ export function RebookModal({
     return map;
   }, [allTrips]);
 
+  const activeVehicleMap = useMemo(() => {
+    const map = new Map<string, BookingTripVehicleView>();
+    for (const trip of allTrips) {
+      for (const v of trip.vehicles) {
+        if (isActive(v.bookingStatus ?? v.booking_status)) {
+          const id = v.booking_trip_cargo_id ?? v.bookingTripCargoId;
+          map.set(id, v);
+        }
+      }
+    }
+    return map;
+  }, [allTrips]);
+
+  const activeCargoMap = useMemo(() => {
+    const map = new Map<string, BookingTripCargoView>();
+    for (const trip of allTrips) {
+      for (const c of (trip.cargos ?? trip.cargo ?? [])) {
+        if (isActive(c.bookingStatus ?? c.booking_status)) {
+          const id = c.booking_trip_cargo_id ?? c.bookingTripCargoId;
+          map.set(id, c);
+        }
+      }
+    }
+    return map;
+  }, [allTrips]);
+
   // Available dates query
   const {
     data: availableDates,
@@ -119,9 +153,9 @@ export function RebookModal({
       destination_code: destCode,
       departure_date: selectedDate,
       passenger_count: selectedPassengerIds.size || 1,
-      vehicle_count: 0,
+      vehicle_count: selectedVehicleIds.size || 0,
     };
-  }, [originCode, destCode, selectedDate, selectedPassengerIds.size]);
+  }, [originCode, destCode, selectedDate, selectedPassengerIds.size, selectedVehicleIds.size]);
 
   const {
     data: tripsResult,
@@ -132,6 +166,24 @@ export function RebookModal({
 
   const togglePassenger = (id: string) => {
     setSelectedPassengerIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleVehicle = (id: string) => {
+    setSelectedVehicleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCargo = (id: string) => {
+    setSelectedCargoIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -175,26 +227,67 @@ export function RebookModal({
       };
     });
 
+    // Reconstruct vehicles from old booking data
+    const vehicles = Array.from(selectedVehicleIds).map((id) => {
+      const v = activeVehicleMap.get(id);
+      return {
+        plateNumber: v?.plateNumber ?? v?.plate_number ?? "",
+        make: v?.make ?? "",
+        model: v?.model ?? "",
+        vehicleTypeId: v?.vehicleTypeId,
+        cargoClassCode: v?.cargoClassCode,
+        tripAssignments: [{ tripId: selectedTripId }],
+      };
+    });
+
+    // Reconstruct loose cargos from old booking data
+    const cargos = Array.from(selectedCargoIds).map((id) => {
+      const c = activeCargoMap.get(id);
+      return {
+        description: c?.description ?? "",
+        weight: c?.weight ?? 0,
+        quantity: c?.quantity ?? 1,
+        cargoClassCode: c?.cargoClassCode,
+        tripAssignments: [{ tripId: selectedTripId }],
+      };
+    });
+
+    const passengerIds = Array.from(selectedPassengerIds);
+    const cargoIds = Array.from(selectedCargoIds);
+
+    const newBookingData = {
+      bookingSource: "travel_agency",
+      bookingType: "Single",
+      trips: [
+        { tripType: "departure", sequence: 1, tripId: selectedTripId },
+      ],
+      passengers,
+      vehicles,
+      cargos,
+      consignee: `${passengers[0]?.firstName ?? ""} ${passengers[0]?.lastName ?? ""}`.trim(),
+      payment_method: "WALLET",
+      globalUserId: user?.id,
+      agencyId: user?.travel_agency_id,
+    };
+
+    console.log("[Rebook] Selected passengers:", passengerIds);
+    console.log("[Rebook] Selected vehicles:", Array.from(selectedVehicleIds));
+    console.log("[Rebook] Selected cargos:", cargoIds);
+    console.log("[Rebook] Payload:", { passengerIds, cargoIds, newBookingData });
+
     mutation.mutate(
       {
-        passengerIds: Array.from(selectedPassengerIds),
-        newBookingData: {
-          bookingSource: "travel_agency",
-          bookingType: "Single",
-          trips: [
-            { tripType: "departure", sequence: 1, tripId: selectedTripId },
-          ],
-          passengers,
-          vehicles: [],
-          consignee: `${passengers[0]?.firstName ?? ""} ${passengers[0]?.lastName ?? ""}`.trim(),
-          payment_method: "WALLET",
-          globalUserId: user?.id,
-          agencyId: user?.travel_agency_id,
-        },
+        passengerIds,
+        cargoIds,
+        newBookingData,
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          console.log("[Rebook] Success:", data);
           resetAndClose();
+        },
+        onError: (err) => {
+          console.error("[Rebook] Error:", err);
         },
       },
     );
@@ -203,17 +296,24 @@ export function RebookModal({
   const resetAndClose = () => {
     setStep("select");
     setSelectedPassengerIds(new Set());
+    setSelectedVehicleIds(new Set());
+    setSelectedCargoIds(new Set());
     setSelectedDate(null);
     setSelectedTripId(null);
     onOpenChange(false);
   };
+
+  const hasAnySelected =
+    selectedPassengerIds.size > 0 ||
+    selectedVehicleIds.size > 0 ||
+    selectedCargoIds.size > 0;
 
   return (
     <Dialog open={open} onOpenChange={resetAndClose}>
       <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {step === "select" ? "Select Passengers to Rebook" : "Select New Trip"}
+            {step === "select" ? "Select Items to Rebook" : "Select New Trip"}
           </DialogTitle>
           <DialogDescription>
             Booking {booking.reference_no ?? bookingId.slice(0, 8)}
@@ -227,8 +327,20 @@ export function RebookModal({
               const activePassengers = trip.passengers.filter((p) =>
                 isActive(p.bookingStatus ?? p.booking_status),
               );
+              const activeVehicles = trip.vehicles.filter((v) =>
+                isActive(v.bookingStatus ?? v.booking_status),
+              );
+              const activeCargos = (trip.cargos ?? trip.cargo ?? []).filter((c) =>
+                isActive(c.bookingStatus ?? c.booking_status),
+              );
 
-              if (activePassengers.length === 0) return null;
+              if (
+                activePassengers.length === 0 &&
+                activeVehicles.length === 0 &&
+                activeCargos.length === 0
+              ) {
+                return null;
+              }
 
               return (
                 <div key={trip.id} className="space-y-2">
@@ -236,33 +348,97 @@ export function RebookModal({
                     {trip.origin} → {trip.destination}
                     {allTrips.length > 1 ? ` (Leg ${i + 1})` : ""}
                   </p>
-                  <div className="space-y-1 pl-2">
-                    {activePassengers.map((p) => {
-                      const id =
-                        p.booking_trip_passenger_id ??
-                        p.bookingTripPassengerId;
-                      return (
-                        <label
-                          key={id}
-                          className="flex items-center gap-2 text-sm cursor-pointer"
-                        >
-                          <Checkbox
-                            checked={selectedPassengerIds.has(id)}
-                            onCheckedChange={() => togglePassenger(id)}
-                          />
-                          <span className="flex-1">
-                            {p.name ?? `${p.first_name ?? p.firstName} ${p.last_name ?? p.lastName}`}
-                          </span>
-                          <span className="text-muted-foreground text-xs">
-                            {p.discountType ?? p.discount_type}
-                          </span>
-                          <span className="font-medium">
-                            {formatCurrency(p.price)}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
+
+                  {activePassengers.length > 0 && (
+                    <div className="space-y-1 pl-2">
+                      <p className="text-xs text-muted-foreground font-medium">Passengers</p>
+                      {activePassengers.map((p) => {
+                        const id =
+                          p.booking_trip_passenger_id ??
+                          p.bookingTripPassengerId;
+                        return (
+                          <label
+                            key={id}
+                            className="flex items-center gap-2 text-sm cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={selectedPassengerIds.has(id)}
+                              onCheckedChange={() => togglePassenger(id)}
+                            />
+                            <span className="flex-1">
+                              {p.name ?? `${p.first_name ?? p.firstName} ${p.last_name ?? p.lastName}`}
+                            </span>
+                            <span className="text-muted-foreground text-xs">
+                              {p.discountType ?? p.discount_type}
+                            </span>
+                            <span className="font-medium">
+                              {formatCurrency(p.price)}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {activeVehicles.length > 0 && (
+                    <div className="space-y-1 pl-2">
+                      <p className="text-xs text-muted-foreground font-medium">Vehicles</p>
+                      {activeVehicles.map((v) => {
+                        const id =
+                          v.booking_trip_cargo_id ?? v.bookingTripCargoId;
+                        return (
+                          <label
+                            key={id}
+                            className="flex items-center gap-2 text-sm cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={selectedVehicleIds.has(id)}
+                              onCheckedChange={() => toggleVehicle(id)}
+                            />
+                            <span className="flex-1">
+                              {v.plate_number ?? v.plateNumber}
+                              {v.make ? ` — ${v.make} ${v.model ?? ""}` : ""}
+                            </span>
+                            <span className="font-medium">
+                              {formatCurrency(v.price)}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {activeCargos.length > 0 && (
+                    <div className="space-y-1 pl-2">
+                      <p className="text-xs text-muted-foreground font-medium">Cargo</p>
+                      {activeCargos.map((c) => {
+                        const id =
+                          c.booking_trip_cargo_id ?? c.bookingTripCargoId;
+                        return (
+                          <label
+                            key={id}
+                            className="flex items-center gap-2 text-sm cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={selectedCargoIds.has(id)}
+                              onCheckedChange={() => toggleCargo(id)}
+                            />
+                            <span className="flex-1">
+                              {c.description}
+                              {c.cargo_type ? ` (${c.cargo_type})` : ""}
+                            </span>
+                            <span className="text-muted-foreground text-xs">
+                              {c.quantity > 1 ? `×${c.quantity}` : ""}
+                            </span>
+                            <span className="font-medium">
+                              {formatCurrency(c.price)}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {i < allTrips.length - 1 && <Separator />}
                 </div>
               );
@@ -373,7 +549,7 @@ export function RebookModal({
               </Button>
               <Button
                 onClick={handleNext}
-                disabled={selectedPassengerIds.size === 0}
+                disabled={!hasAnySelected}
               >
                 Next — Select Trip
               </Button>

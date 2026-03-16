@@ -29,7 +29,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useMemo, useEffect } from "react";
 import { FormProvider, useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ import { useCreateBooking } from "@/hooks/mutations/bookings/use-create-booking"
 import { useRoutesForAgency } from "@/hooks/queries/routes/use-routes";
 import { useMarkupByAgentAndRoute } from "@/hooks/queries/markup/use-markups";
 import { useAuthStore } from "@/lib/stores/auth.store";
+import { useBookingFormUiStore } from "@/lib/stores/booking-form-ui.store";
 import {
   CreateBookingSchema,
   type BookingFormData,
@@ -73,7 +74,16 @@ export default function CreateBookingPage() {
   const bookingData = bookingResponse;
 
   // 2-step flow: 1 = form, 2 = confirm
-  const [step, setStep] = useState(1);
+  const step = useBookingFormUiStore((s) => s.step);
+  const setStep = useBookingFormUiStore((s) => s.setStep);
+  const bumpPricingVersion = useBookingFormUiStore((s) => s.bumpPricingVersion);
+  const pricingVersion = useBookingFormUiStore((s) => s.pricingVersion);
+  const resetUiStore = useBookingFormUiStore((s) => s.reset);
+
+  // Reset UI store on unmount
+  useEffect(() => {
+    return () => resetUiStore();
+  }, [resetUiStore]);
 
   // Flatten departure and return segments into trips array
   const allTrips: BookingFormTrip[] = useMemo(() => {
@@ -230,15 +240,9 @@ export default function CreateBookingPage() {
   const looseCargos = watch("looseCargos");
   const taMarkup = watch("ta_markup");
 
-  // Create a pricing-relevant fingerprint that changes when any pricing field
-  // changes — not just when rows are added/removed.
-  // This captures: passenger type, cabin, vehicle class, cargo class.
-  const [formVersion, setFormVersion] = useState(0);
+  // Bump pricingVersion in the UI store whenever a pricing-relevant field changes.
   useEffect(() => {
-    const subscription = form.watch((_value, { name }) => {
-      // Only bump the version for pricing-relevant field changes
-      // Note: passenger cabin/discount changes go through "tripAssignments"
-      // because the whole array is replaced via onUpdate(index, "tripAssignments", ...)
+    const subscription = form.watch((_value: unknown, { name }: { name?: string }) => {
       if (
         name?.includes("discountType") ||
         name?.includes("cabinId") ||
@@ -248,18 +252,11 @@ export default function CreateBookingPage() {
         name?.includes("weight") ||
         name?.includes("quantity")
       ) {
-        setFormVersion((v) => v + 1);
+        bumpPricingVersion();
       }
     });
     return () => subscription.unsubscribe();
-  }, [form]);
-
-  // Track pricing loading state from TripSummaryPanel to disable
-  // pricing-relevant selects while rates are being fetched
-  const [isPricingLoading, setIsPricingLoading] = useState(false);
-  const handlePricingLoadingChange = useCallback((loading: boolean) => {
-    setIsPricingLoading(loading);
-  }, []);
+  }, [form, bumpPricingVersion]);
 
   // Build a live form snapshot for TripSummaryPanel pricing
   // Re-computes when rows change OR when pricing-relevant fields change
@@ -272,7 +269,8 @@ export default function CreateBookingPage() {
       ta_markup: taMarkup,
     };
     return data;
-  }, [passengers, vehicles, looseCargos, taMarkup, form, formVersion]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passengers, vehicles, looseCargos, taMarkup, form, pricingVersion]);
 
   // Add/remove handlers
   const handleAddPassenger = () => {
@@ -494,7 +492,7 @@ export default function CreateBookingPage() {
                             passengers={passengers}
                             trips={allTrips}
                             discountTypes={discountTypes}
-                            isPricingLoading={isPricingLoading}
+
                             onRemove={handleRemovePassenger}
                             onUpdate={(
                               index: number,
@@ -525,7 +523,7 @@ export default function CreateBookingPage() {
                                 ? `${pax.firstName} ${pax.lastName ?? ""}`.trim()
                                 : `Passenger ${idx + 1}`,
                             }))}
-                            isPricingLoading={isPricingLoading}
+
                             onRemove={handleRemoveVehicle}
                             onUpdate={(
                               index: number,
@@ -550,7 +548,7 @@ export default function CreateBookingPage() {
                             cargos={looseCargos}
                             cargoClasses={cargoClasses}
                             trips={allTrips}
-                            isPricingLoading={isPricingLoading}
+
                             onRemove={handleRemoveCargo}
                             onUpdate={(
                               index: number,
@@ -610,7 +608,6 @@ export default function CreateBookingPage() {
               bookingData={bookingData}
               allTrips={allTrips}
               formData={watchedFormData}
-              onPricingLoadingChange={handlePricingLoadingChange}
               onSnapshotId={(id) => form.setValue("rateSnapshotId", id)}
             />
           </div>

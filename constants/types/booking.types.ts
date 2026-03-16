@@ -432,6 +432,7 @@ export interface TripSelection {
 export interface BulkInvalidateRequest {
   selectedPassengerIds?: string[];
   selectedVehicleIds?: string[];
+  selectedCargoIds?: string[];
   remarks: string;
   reasonType?: string;
   tripSelections?: TripSelection[];
@@ -440,6 +441,7 @@ export interface BulkInvalidateRequest {
 export interface BulkRefundRequest {
   selectedPassengerIds?: string[];
   selectedVehicleIds?: string[];
+  selectedCargoIds?: string[];
   remarks: string;
   reasonType?: string;
   tripSelections?: TripSelection[];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   IconUsers,
@@ -18,26 +18,54 @@ import type { AvailableTripsQuery } from "@/constants/types/booking.types";
 import TripResults from "@/components/features/book/TripResults";
 import AvailableDates from "@/components/features/book/AvailableDates";
 import { PortCombobox } from "@/components/features/book/PortCombobox";
+import {
+  useBookSearchStore,
+  selectIsRoundTrip,
+  selectCanContinue,
+} from "@/lib/stores/book-search.store";
 
 export default function BookTripPage() {
   const router = useRouter();
-  const [tripType, setTripType] = useState<"one-way" | "round-trip">("one-way");
-  const [originCode, setOriginCode] = useState("");
-  const [destinationCode, setDestinationCode] = useState("");
-  const [departureDate, setDepartureDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
-  const [passengerCount, setPassengerCount] = useState(1);
-  const [vehicleCount, setVehicleCount] = useState(0);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
 
-  // Round-trip state
-  const [returnDate, setReturnDate] = useState("");
-  const [selectedReturnTripIds, setSelectedReturnTripIds] = useState<string[]>(
-    [],
+  // Store state + actions
+  const tripType = useBookSearchStore((s) => s.tripType);
+  const originCode = useBookSearchStore((s) => s.originCode);
+  const destinationCode = useBookSearchStore((s) => s.destinationCode);
+  const departureDate = useBookSearchStore((s) => s.departureDate);
+  const passengerCount = useBookSearchStore((s) => s.passengerCount);
+  const vehicleCount = useBookSearchStore((s) => s.vehicleCount);
+  const hasSearched = useBookSearchStore((s) => s.hasSearched);
+  const selectedTripIds = useBookSearchStore((s) => s.selectedTripIds);
+  const returnDate = useBookSearchStore((s) => s.returnDate);
+  const hasSearchedReturn = useBookSearchStore((s) => s.hasSearchedReturn);
+  const selectedReturnTripIds = useBookSearchStore(
+    (s) => s.selectedReturnTripIds,
   );
-  const [hasSearchedReturn, setHasSearchedReturn] = useState(false);
+  const isRoundTrip = useBookSearchStore(selectIsRoundTrip);
+  const canContinue = useBookSearchStore(selectCanContinue);
+
+  const {
+    setTripType,
+    setOriginCode,
+    setDestinationCode,
+    setDepartureDate,
+    setReturnDate,
+    incrementPassengers,
+    decrementPassengers,
+    incrementVehicles,
+    decrementVehicles,
+    search,
+    selectTrip,
+    selectReturnTrip,
+    handleDateSelect,
+    handleReturnDateSelect,
+    reset,
+  } = useBookSearchStore();
+
+  // Reset store on unmount so navigating back starts fresh
+  useEffect(() => {
+    return () => reset();
+  }, [reset]);
 
   // Fetch routes for the current user's travel agency
   const { data: routes, isLoading: routesLoading } = useRoutes();
@@ -106,7 +134,7 @@ export default function BookTripPage() {
     error,
   } = useAvailableTrips(query, hasSearched);
 
-  // Return trips query (swapped origin/destination — marketplace pattern)
+  // Return trips query (swapped origin/destination)
   const returnQuery: AvailableTripsQuery | null =
     hasSearchedReturn && originCode && destinationCode && returnDate
       ? {
@@ -124,99 +152,20 @@ export default function BookTripPage() {
     error: returnError,
   } = useAvailableTrips(returnQuery, hasSearchedReturn);
 
-  // Clear return date if departure date moves past it
-  useEffect(() => {
-    if (returnDate && departureDate && returnDate < departureDate) {
-      setReturnDate("");
-      setHasSearchedReturn(false);
-      setSelectedReturnTripIds([]);
-    }
-  }, [departureDate, returnDate]);
-
-  const resetReturnState = () => {
-    setReturnDate("");
-    setHasSearchedReturn(false);
-    setSelectedReturnTripIds([]);
-  };
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (originCode && destinationCode && departureDate) {
-      setHasSearched(true);
-      setSelectedTripIds([]);
-      if (tripType === "round-trip" && returnDate) {
-        setHasSearchedReturn(true);
-        setSelectedReturnTripIds([]);
-      }
-    }
-  };
-
-  const handleOriginSelect = (portCode: string) => {
-    setOriginCode(portCode);
-    setDestinationCode("");
-    if (hasSearched) {
-      setHasSearched(false);
-      setSelectedTripIds([]);
-    }
-    resetReturnState();
-  };
-
-  const handleDestinationSelect = (portCode: string) => {
-    setDestinationCode(portCode);
-    resetReturnState();
-  };
-
-  const handleTripTypeChange = (type: "one-way" | "round-trip") => {
-    setTripType(type);
-    if (type === "one-way") {
-      resetReturnState();
-    }
-  };
-
-  const handleDateSelect = (date: string) => {
-    setDepartureDate(date);
-    setHasSearched(true);
-    setSelectedTripIds([]);
-  };
-
-  const handleReturnDateSelect = (date: string) => {
-    setReturnDate(date);
-    setHasSearchedReturn(true);
-    setSelectedReturnTripIds([]);
-  };
-
-  const handleTripSelect = (tripId: string) => {
-    setSelectedTripIds((prev) =>
-      prev.includes(tripId)
-        ? prev.filter((id) => id !== tripId)
-        : [...prev, tripId],
-    );
-  };
-
-  const handleReturnTripSelect = (tripId: string) => {
-    setSelectedReturnTripIds((prev) =>
-      prev.includes(tripId)
-        ? prev.filter((id) => id !== tripId)
-        : [...prev, tripId],
-    );
+    search();
   };
 
   const handleContinue = () => {
-    if (selectedTripIds.length === 0) return;
-    if (tripType === "round-trip" && selectedReturnTripIds.length === 0) return;
-
+    if (!canContinue) return;
     const params = new URLSearchParams();
     params.set("departure", selectedTripIds.join(","));
-    if (tripType === "round-trip" && selectedReturnTripIds.length > 0) {
+    if (isRoundTrip && selectedReturnTripIds.length > 0) {
       params.set("return", selectedReturnTripIds.join(","));
     }
     router.push(`/dashboard/book/create?${params.toString()}`);
   };
-
-  const isRoundTrip = tripType === "round-trip";
-  const canContinue =
-    selectedTripIds.length > 0 &&
-    (!isRoundTrip || selectedReturnTripIds.length > 0);
 
   return (
     <div className="flex flex-1 flex-col min-w-0">
@@ -250,7 +199,7 @@ export default function BookTripPage() {
                     type="radio"
                     className="sr-only"
                     checked={tripType === "one-way"}
-                    onChange={() => handleTripTypeChange("one-way")}
+                    onChange={() => setTripType("one-way")}
                   />
                   <span className="text-sm">One Way</span>
                 </label>
@@ -270,7 +219,7 @@ export default function BookTripPage() {
                     type="radio"
                     className="sr-only"
                     checked={tripType === "round-trip"}
-                    onChange={() => handleTripTypeChange("round-trip")}
+                    onChange={() => setTripType("round-trip")}
                   />
                   <span className="text-sm">Round Trip</span>
                 </label>
@@ -294,7 +243,7 @@ export default function BookTripPage() {
                     id="origin"
                     options={originOptions}
                     value={originCode}
-                    onSelect={(code) => handleOriginSelect(code)}
+                    onSelect={setOriginCode}
                     placeholder="Origin port"
                     disabled={routesLoading}
                   />
@@ -312,7 +261,7 @@ export default function BookTripPage() {
                     id="destination"
                     options={destinationOptions}
                     value={destinationCode}
-                    onSelect={(code) => handleDestinationSelect(code)}
+                    onSelect={setDestinationCode}
                     placeholder="Destination port"
                     disabled={!originCode || routesLoading}
                   />
@@ -368,7 +317,7 @@ export default function BookTripPage() {
                   <button
                     type="button"
                     className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-lg leading-none"
-                    onClick={() => setPassengerCount((p) => Math.max(1, p - 1))}
+                    onClick={decrementPassengers}
                   >
                     -
                   </button>
@@ -381,7 +330,7 @@ export default function BookTripPage() {
                   <button
                     type="button"
                     className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-lg leading-none"
-                    onClick={() => setPassengerCount((p) => p + 1)}
+                    onClick={incrementPassengers}
                   >
                     +
                   </button>
@@ -395,7 +344,7 @@ export default function BookTripPage() {
                   <button
                     type="button"
                     className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-lg leading-none"
-                    onClick={() => setVehicleCount((v) => Math.max(0, v - 1))}
+                    onClick={decrementVehicles}
                   >
                     -
                   </button>
@@ -406,7 +355,7 @@ export default function BookTripPage() {
                   <button
                     type="button"
                     className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-lg leading-none"
-                    onClick={() => setVehicleCount((v) => v + 1)}
+                    onClick={incrementVehicles}
                   >
                     +
                   </button>
@@ -462,7 +411,7 @@ export default function BookTripPage() {
             isLoading={isLoading}
             error={error}
             selectedTripIds={selectedTripIds}
-            onTripSelect={handleTripSelect}
+            onTripSelect={selectTrip}
           />
         )}
 
@@ -475,7 +424,7 @@ export default function BookTripPage() {
             isLoading={returnLoading}
             error={returnError}
             selectedTripIds={selectedReturnTripIds}
-            onTripSelect={handleReturnTripSelect}
+            onTripSelect={selectReturnTrip}
           />
         )}
 

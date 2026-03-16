@@ -51,6 +51,9 @@ export function RefundModal({
   const [selectedVehicleIds, setSelectedVehicleIds] = useState<Set<string>>(
     new Set(),
   );
+  const [selectedCargoIds, setSelectedCargoIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [remarks, setRemarks] = useState("");
   const [reasonType, setReasonType] = useState("");
   const mutation = useBulkRefund(bookingId);
@@ -78,27 +81,47 @@ export function RefundModal({
     });
   };
 
-  const handleSubmit = () => {
-    mutation.mutate(
-      {
-        selectedPassengerIds: Array.from(selectedPassengerIds),
-        selectedVehicleIds: Array.from(selectedVehicleIds),
-        remarks,
-        reasonType: reasonType || undefined,
-      },
-      {
-        onSuccess: () => {
-          setSelectedPassengerIds(new Set());
-          setSelectedVehicleIds(new Set());
-          setRemarks("");
-          setReasonType("");
-          onOpenChange(false);
-        },
-      },
-    );
+  const toggleCargo = (id: string) => {
+    setSelectedCargoIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  const totalSelected = selectedPassengerIds.size + selectedVehicleIds.size;
+  const handleSubmit = () => {
+    const payload = {
+      selectedPassengerIds: Array.from(selectedPassengerIds),
+      selectedVehicleIds: Array.from(selectedVehicleIds),
+      selectedCargoIds: Array.from(selectedCargoIds),
+      remarks,
+      reasonType: reasonType || undefined,
+    };
+
+    console.log("[Refund] Selected passengers:", payload.selectedPassengerIds);
+    console.log("[Refund] Selected vehicles:", payload.selectedVehicleIds);
+    console.log("[Refund] Selected cargos:", payload.selectedCargoIds);
+    console.log("[Refund] Payload:", payload);
+
+    mutation.mutate(payload, {
+      onSuccess: (data) => {
+        console.log("[Refund] Success:", data);
+        setSelectedPassengerIds(new Set());
+        setSelectedVehicleIds(new Set());
+        setSelectedCargoIds(new Set());
+        setRemarks("");
+        setReasonType("");
+        onOpenChange(false);
+      },
+      onError: (err) => {
+        console.error("[Refund] Error:", err);
+      },
+    });
+  };
+
+  const totalSelected =
+    selectedPassengerIds.size + selectedVehicleIds.size + selectedCargoIds.size;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -107,7 +130,7 @@ export function RefundModal({
           <DialogTitle>Refund Booking</DialogTitle>
           <DialogDescription>
             Booking {booking.reference_no ?? bookingId.slice(0, 8)} — select
-            passengers and vehicles to refund
+            passengers, vehicles, and cargo to refund
           </DialogDescription>
         </DialogHeader>
 
@@ -119,8 +142,15 @@ export function RefundModal({
             const activeVehicles = trip.vehicles.filter((v) =>
               isActive(v.bookingStatus ?? v.booking_status),
             );
+            const activeCargos = (trip.cargos ?? trip.cargo ?? []).filter((c) =>
+              isActive(c.bookingStatus ?? c.booking_status),
+            );
 
-            if (activePassengers.length === 0 && activeVehicles.length === 0) {
+            if (
+              activePassengers.length === 0 &&
+              activeVehicles.length === 0 &&
+              activeCargos.length === 0
+            ) {
               return null;
             }
 
@@ -187,6 +217,39 @@ export function RefundModal({
                           </span>
                           <span className="font-medium">
                             {formatCurrency(v.price)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {activeCargos.length > 0 && (
+                  <div className="space-y-1 pl-2">
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Cargo
+                    </p>
+                    {activeCargos.map((c) => {
+                      const id =
+                        c.booking_trip_cargo_id ?? c.bookingTripCargoId;
+                      return (
+                        <label
+                          key={id}
+                          className="flex items-center gap-2 text-sm cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={selectedCargoIds.has(id)}
+                            onCheckedChange={() => toggleCargo(id)}
+                          />
+                          <span className="flex-1">
+                            {c.description}
+                            {c.cargo_type ? ` (${c.cargo_type})` : ""}
+                          </span>
+                          <span className="text-muted-foreground text-xs">
+                            {c.quantity > 1 ? `×${c.quantity}` : ""}
+                          </span>
+                          <span className="font-medium">
+                            {formatCurrency(c.price)}
                           </span>
                         </label>
                       );
