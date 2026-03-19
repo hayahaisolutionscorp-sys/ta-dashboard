@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff } from "lucide-react";
+import axios from "axios";
+import { Eye, EyeOff, Clock, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,17 @@ import {
 } from "@/lib/validators/auth.validators";
 import { useLogin } from "@/services/auth.service";
 import { getErrorMessage } from "@/lib/api";
+
+type AccountBlockReason = "pending" | "failed" | null;
+
+function getAccountBlockReason(error: unknown): AccountBlockReason {
+  if (axios.isAxiosError(error) && error.response?.status === 403) {
+    const msg: string = error.response?.data?.message ?? "";
+    if (msg.toLowerCase().includes("pending")) return "pending";
+    if (msg.toLowerCase().includes("sync failed")) return "failed";
+  }
+  return null;
+}
 
 // Map raw API error messages to user-friendly text
 function getFriendlyError(error: unknown): string {
@@ -44,6 +56,7 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [blockReason, setBlockReason] = useState<AccountBlockReason>(null);
 
   const loginMutation = useLogin();
 
@@ -57,14 +70,19 @@ export function LoginForm({
   });
 
   const onSubmit = (data: LoginFormData) => {
+    setBlockReason(null);
     loginMutation.mutate(data, {
       onSuccess: () => {
         router.push("/dashboard");
         router.refresh();
       },
       onError: (error) => {
-        // Show inline form error instead of crashing Next.js
-        setError("root", { message: getFriendlyError(error) });
+        const reason = getAccountBlockReason(error);
+        if (reason) {
+          setBlockReason(reason);
+        } else {
+          setError("root", { message: getFriendlyError(error) });
+        }
       },
     });
   };
@@ -90,7 +108,29 @@ export function LoginForm({
                   Travel Agent Portal
                 </span>
               </div>
-              {errors.root && (
+              {blockReason === "pending" && (
+                <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm p-3 rounded-md">
+                  <Clock className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Account pending verification</p>
+                    <p className="text-xs mt-0.5 text-amber-700 dark:text-amber-400">
+                      Your account is awaiting admin approval. Please check back later.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {blockReason === "failed" && (
+                <div className="flex items-start gap-3 bg-destructive/10 border border-destructive/30 text-destructive text-sm p-3 rounded-md">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Account sync failed</p>
+                    <p className="text-xs mt-0.5">
+                      Please contact support to resolve your account.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {!blockReason && errors.root && (
                 <div className="text-destructive text-sm text-center bg-destructive/10 p-3 rounded-md">
                   {errors.root.message}
                 </div>
