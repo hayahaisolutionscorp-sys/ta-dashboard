@@ -13,6 +13,8 @@ import {
   IconPhone,
   IconMapPin,
   IconReceipt,
+  IconWallet,
+  IconCreditCard,
 } from "@tabler/icons-react";
 
 interface BookingConfirmProps {
@@ -243,6 +245,28 @@ export default function BookingConfirm({
           </CardContent>
         </Card>
       )}
+
+      {/* Payment Method */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            {formData.paymentMethod === "TA-WALLET" ? (
+              <IconWallet className="h-4 w-4 text-blue-600" />
+            ) : (
+              <IconCreditCard className="h-4 w-4 text-indigo-600" />
+            )}
+            <h3 className="text-sm font-semibold">Payment Method</h3>
+          </div>
+          <div className="text-sm font-medium">
+            {formData.paymentMethod === "TA-WALLET"
+              ? "Wallet Credit"
+              : "Online Payment (PayMongo)"}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Agent markup is collected from the passenger and is not deducted from your wallet.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Actions */}
       <div className="flex justify-end gap-2 pt-2">

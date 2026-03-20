@@ -200,9 +200,9 @@ class BookingService {
 
     // Set booking source as travel_agency
     payload.bookingSource = "travel_agency";
-    if (!payload.payment_method) {
-      payload.payment_method = "CASH";
-    }
+    // Use the TA-selected payment method; fall back to CASH only if somehow missing
+    payload.payment_method = (payload.paymentMethod as string) ?? "CASH";
+    delete payload.paymentMethod;
 
     // Pass the global TA user ID + agency ID so the client API
     // can resolve the local booked_by_id in its own DB

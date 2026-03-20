@@ -38,6 +38,7 @@ import { useBookingData } from "@/hooks/queries/bookings/use-booking-data";
 import { useCreateBooking } from "@/hooks/mutations/bookings/use-create-booking";
 import { useRoutesForAgency } from "@/hooks/queries/routes/use-routes";
 import { useMarkupByAgentAndRoute } from "@/hooks/queries/markup/use-markups";
+import { usePricingCalculation } from "@/hooks/mutations/bookings/use-pricing-calculation";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { useBookingFormUiStore } from "@/lib/stores/booking-form-ui.store";
 import {
@@ -47,6 +48,7 @@ import {
 import type {
   TripSummary,
   BookingFormTrip,
+  CalculatePricingRequest,
 } from "@/constants/types/booking.types";
 import PassengersSection from "@/components/features/book/sections/PassengersSection";
 import VehiclesSection from "@/components/features/book/sections/VehiclesSection";
@@ -57,6 +59,7 @@ import BookingControls from "@/components/features/book/sections/BookingControls
 import BookingConfirm from "@/components/features/book/BookingConfirm";
 import TripSummaryPanel from "@/components/features/book/TripSummaryPanel";
 import CreateBookingSkeleton from "@/components/features/book/CreateBookingSkeleton";
+import PaymentMethodSection from "@/components/features/book/sections/PaymentMethodSection";
 import { IconArrowLeft } from "@tabler/icons-react";
 
 export default function CreateBookingPage() {
@@ -191,7 +194,8 @@ export default function CreateBookingPage() {
 
   // Initialize form
   const form = useForm<BookingFormData>({
-    resolver: zodResolver(CreateBookingSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(CreateBookingSchema) as any,
     mode: "onChange",
     defaultValues: {
       bookingType: "Single",
@@ -208,6 +212,7 @@ export default function CreateBookingPage() {
       remarks: "",
       ta_markup: 0,
       rateSnapshotId: undefined,
+      paymentMethod: "TA-WALLET" as BookingFormData["paymentMethod"],
     },
   });
 
@@ -271,6 +276,54 @@ export default function CreateBookingPage() {
     return data;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [passengers, vehicles, looseCargos, taMarkup, form, pricingVersion]);
+
+  // Build pricing request for wallet payable-amount check (excluding ta_markup)
+  const payablePricingRequest: CalculatePricingRequest | null = useMemo(() => {
+    if (!allTrips.length) return null;
+    const tripIds = allTrips.map((t) => t.id);
+    const routeCode = allTrips.at(0)?.route_code ?? "";
+    if (!routeCode) return null;
+    const hasItems =
+      (passengers?.length ?? 0) > 0 ||
+      (vehicles?.length ?? 0) > 0 ||
+      (looseCargos?.length ?? 0) > 0;
+    if (!hasItems) return null;
+    const cargos = [
+      ...(vehicles ?? []).map((veh, idx) => ({
+        index: idx,
+        cargoType: "rolling" as const,
+        cargoClassCode: veh.cargoClassCode || undefined,
+        vehicleTypeId: veh.vehicleTypeId || undefined,
+        tripAssignments: (veh.tripAssignments ?? []).map((ta) => ({ tripId: ta.tripId })),
+      })),
+      ...(looseCargos ?? []).map((cargo, idx) => ({
+        index: (vehicles?.length ?? 0) + idx,
+        cargoType: "loose" as const,
+        cargoClassCode: cargo.cargoClassCode || undefined,
+        weight: cargo.weight,
+        quantity: cargo.quantity,
+        tripAssignments: (cargo.tripAssignments ?? []).map((ta) => ({ tripId: ta.tripId })),
+      })),
+    ];
+    return {
+      routeCode,
+      tripIds,
+      passengers: (passengers ?? []).map((pax, idx) => ({
+        index: idx,
+        passengerType: pax.tripAssignments?.at(0)?.discountType ?? "Adult",
+        tripAssignments: (pax.tripAssignments ?? []).map((ta) => ({
+          tripId: ta.tripId,
+          cabinId: ta.cabinId,
+          discountType: ta.discountType,
+        })),
+      })),
+      cargos: cargos.length > 0 ? cargos : undefined,
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passengers, vehicles, looseCargos, allTrips, pricingVersion]);
+
+  const { data: payablePricing } = usePricingCalculation({ request: payablePricingRequest });
+  const payableAmount = payablePricing?.grandTotal ?? 0;
 
   // Add/remove handlers
   const handleAddPassenger = () => {
@@ -569,6 +622,11 @@ export default function CreateBookingPage() {
                       {/* Additional Details (Markup + Remarks) */}
                       <div className="bg-gray-50/50 rounded-lg p-3 border border-gray-100">
                         <AdditionalInfoSection defaultMarkup={defaultMarkup} />
+                      </div>
+
+                      {/* Payment Method */}
+                      <div className="bg-gray-50/50 rounded-lg p-3 border border-gray-100">
+                        <PaymentMethodSection payableAmount={payableAmount} />
                       </div>
 
                       {/* Submit */}

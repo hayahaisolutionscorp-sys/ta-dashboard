@@ -265,7 +265,7 @@ export function RebookModal({
       vehicles,
       cargos,
       consignee: `${passengers[0]?.firstName ?? ""} ${passengers[0]?.lastName ?? ""}`.trim(),
-      payment_method: "WALLET",
+      payment_method: "TA-WALLET",
       globalUserId: user?.id,
       agencyId: user?.travel_agency_id,
     };
