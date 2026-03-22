@@ -154,9 +154,9 @@ class BookingService {
       });
     }
 
-    // Map paymentMethod to payment_method
+    // Map paymentMethod → payment_method; fall back to CASH only if missing
     if ("paymentMethod" in payload) {
-      payload.payment_method = payload.paymentMethod;
+      payload.payment_method = (payload.paymentMethod as string) ?? "CASH";
     }
 
     // Remove root fields that cause backend errors
@@ -200,9 +200,6 @@ class BookingService {
 
     // Set booking source as travel_agency
     payload.bookingSource = "travel_agency";
-    // Use the TA-selected payment method; fall back to CASH only if somehow missing
-    payload.payment_method = (payload.paymentMethod as string) ?? "CASH";
-    delete payload.paymentMethod;
 
     // Pass the global TA user ID + agency ID so the client API
     // can resolve the local booked_by_id in its own DB
