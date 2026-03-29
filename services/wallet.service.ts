@@ -18,6 +18,7 @@ import type {
   WithdrawalRequest,
   WithdrawalRequestPayload,
   WalletActivity,
+  PaymentProvider,
 } from "@/constants/types/wallet.types";
 
 class WalletService {
@@ -52,6 +53,49 @@ class WalletService {
     const response = await api.post<WithdrawalRequest>(
       TRAVEL_AGENCY_API.WALLET.WITHDRAWAL_REQUEST,
       payload,
+    );
+    return response.data;
+  }
+  
+  /**
+   * Initiate a PayMongo payment via Payment Intent (GCash, PayMaya, etc.)
+   */
+  async initiatePaymongoPayment(payload: any): Promise<{ redirectUrl: string; paymentIntentId: string }> {
+    const response = await api.post(
+      TRAVEL_AGENCY_API.PAYMENTS.PAYMONGO_INITIATE,
+      payload,
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Create a PayMongo checkout session for wallet deposits.
+   */
+  async createPaymongoCheckoutSession(payload: any): Promise<{ checkoutUrl: string; checkoutSessionId: string; expiresAt: number }> {
+    const response = await api.post(
+      TRAVEL_AGENCY_API.PAYMENTS.CHECKOUT_SESSION,
+      payload,
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Create a Maya checkout session for wallet deposits.
+   */
+  async createMayaCheckout(payload: any): Promise<{ checkoutUrl: string; checkoutId: string; transactionId: string }> {
+    const response = await api.post(
+      TRAVEL_AGENCY_API.PAYMENTS.MAYA_CHECKOUT,
+      payload,
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Fetch only enabled payment providers.
+   */
+  async getEnabledProviders(): Promise<PaymentProvider[]> {
+    const response = await api.get<PaymentProvider[]>(
+      TRAVEL_AGENCY_API.PAYMENT_PROVIDERS.ENABLED,
     );
     return response.data;
   }

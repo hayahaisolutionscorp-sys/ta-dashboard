@@ -56,3 +56,13 @@ export interface WithdrawalRequestPayload {
   travel_agency_id?: number;
   amount: number;
 }
+
+// ==================== Payment Provider ====================
+export interface PaymentProvider {
+  id: number;
+  code: string;
+  name: string;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}

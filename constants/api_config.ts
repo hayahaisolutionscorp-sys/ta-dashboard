@@ -72,4 +72,12 @@ export const TRAVEL_AGENCY_API = {
     DEPOSIT: "/travel-agency-wallet/deposit",
     WITHDRAWAL_REQUEST: "/travel-agency-wallet/withdrawal-request",
   },
+  PAYMENTS: {
+    CHECKOUT_SESSION: "/v2/payments/paymongo/checkout-session",
+    PAYMONGO_INITIATE: "/v2/payments/paymongo/initiate",
+    MAYA_CHECKOUT: "/v2/payments/maya/checkout",
+  },
+  PAYMENT_PROVIDERS: {
+    ENABLED: "/payments/providers/enabled",
+  },
 };

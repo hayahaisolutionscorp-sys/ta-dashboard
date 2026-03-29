@@ -44,3 +44,22 @@ export function useRequestWithdrawal() {
     },
   });
 }
+
+export function useCreatePaymongoCheckout() {
+  return useMutation({
+    mutationFn: (payload: any) =>
+      walletService.createPaymongoCheckoutSession(payload),
+  });
+}
+
+export function useInitiatePaymongoPayment() {
+  return useMutation({
+    mutationFn: (payload: any) => walletService.initiatePaymongoPayment(payload),
+  });
+}
+
+export function useCreateMayaCheckout() {
+  return useMutation({
+    mutationFn: (payload: any) => walletService.createMayaCheckout(payload),
+  });
+}

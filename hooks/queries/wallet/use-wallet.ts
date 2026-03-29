@@ -16,3 +16,12 @@ export function useAgentWallet(agentId: string | null | undefined) {
     enabled: !!agentId,
   });
 }
+
+export function useEnabledProviders() {
+  return useQuery({
+    queryKey: ["payment-providers", "enabled"],
+    queryFn: () => walletService.getEnabledProviders(),
+    staleTime: 0, // Always consider data stale
+    gcTime: 0,    // Do not cache the data at all
+  });
+}
