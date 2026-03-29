@@ -57,6 +57,7 @@ class WalletService {
     );
     return response.data;
   }
+
   /**
    * Submit a manual deposit request (e.g., GCash, bank transfer).
    * The request is queued for admin verification before crediting the wallet.

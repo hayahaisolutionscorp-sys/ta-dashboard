@@ -95,4 +95,12 @@ export const TRAVEL_AGENCY_API = {
     AGENCY_PERFORMANCE_DATA: "/travel-agency-reports/agency-performance/data",
     STAFF_PERFORMANCE_DATA: "/travel-agency-reports/staff-performance/data",
   },
+  PAYMENTS: {
+    CHECKOUT_SESSION: "/v2/payments/paymongo/checkout-session",
+    PAYMONGO_INITIATE: "/v2/payments/paymongo/initiate",
+    MAYA_CHECKOUT: "/v2/payments/maya/checkout",
+  },
+  PAYMENT_PROVIDERS: {
+    ENABLED: "/payments/providers/enabled",
+  },
 };

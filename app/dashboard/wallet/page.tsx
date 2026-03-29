@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   IconWallet,
   IconArrowUpRight,
@@ -55,7 +55,10 @@ import type { WalletActivity } from "@/constants/types/wallet.types";
 
 function formatCurrency(value: number | string | null | undefined): string {
   const num = Number(value ?? 0);
-  return `\u20B1${num.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `\u20B1${num.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function formatDate(dateStr: string): string {
@@ -94,7 +97,9 @@ function TransactionRow({ activity }: { activity: WalletActivity }) {
       <TableCell className="px-3 py-3">
         <div className="flex items-center gap-2">
           <div
-            className={`flex size-7 items-center justify-center rounded-full ${isDeposit ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}
+            className={`flex size-7 items-center justify-center rounded-full ${
+              isDeposit ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+            }`}
           >
             {isDeposit ? (
               <IconArrowDownLeft className="size-3.5" />
@@ -119,7 +124,11 @@ function TransactionRow({ activity }: { activity: WalletActivity }) {
         </div>
       </TableCell>
       <TableCell className="px-3 py-3 text-right">
-        <p className={`text-sm font-semibold ${isDeposit ? "text-green-600" : "text-red-600"}`}>
+        <p
+          className={`text-sm font-semibold ${
+            isDeposit ? "text-green-600" : "text-red-600"
+          }`}
+        >
           {isDeposit ? "+" : "-"}
           {formatCurrency(activity.amount)}
         </p>
@@ -139,14 +148,25 @@ function DepositDialog({
   agencyId: number | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"amount" | "type" | "manual_method" | "instant_method" | "manual_details" | "success">("amount");
+  const [step, setStep] = useState<
+    | "amount"
+    | "type"
+    | "manual_method"
+    | "instant_method"
+    | "manual_details"
+    | "success"
+  >("amount");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<string | null>(null);
   const [manualMethod, setManualMethod] = useState<string | null>(null);
   const [refNumber, setRefNumber] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
 
-  const { data: enabledProviders, refetch: refetchProviders } = useEnabledProviders();
+  const {
+    data: enabledProviders,
+    isLoading: providersLoading,
+    refetch: refetchProviders,
+  } = useEnabledProviders();
   const createPaymongoCheckout = useCreatePaymongoCheckout();
   const initiatePaymongoPayment = useInitiatePaymongoPayment();
   const createMayaCheckout = useCreateMayaCheckout();
@@ -155,6 +175,7 @@ function DepositDialog({
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
+
     if (nextOpen) {
       refetchProviders();
       setStep("amount");
@@ -192,6 +213,7 @@ function DepositDialog({
       if (!method) return;
       targetProvider = method === "card" ? "maya" : "paymongo";
     } else {
+      toast.error("No payment provider is currently enabled.");
       return;
     }
 
@@ -199,39 +221,91 @@ function DepositDialog({
       createMayaCheckout.mutate(
         {
           totalAmount: { value: numAmount, currency: "PHP" },
-          items: [{ name: "Wallet Deposit", quantity: 1, amount: { value: numAmount }, totalAmount: { value: numAmount }, description: `Agency wallet deposit` }],
+          items: [
+            {
+              name: "Wallet Deposit",
+              quantity: 1,
+              amount: { value: numAmount },
+              totalAmount: { value: numAmount },
+              description: "Agency wallet deposit",
+            },
+          ],
           successUrl: `${window.location.origin}/dashboard/wallet?success=true`,
           cancelUrl: `${window.location.origin}/dashboard/wallet?canceled=true`,
           failureUrl: `${window.location.origin}/dashboard/wallet?canceled=true`,
         },
         {
-          onSuccess: (data) => { if (data?.checkoutUrl) window.location.href = data.checkoutUrl; },
-          onError: () => { toast.error("Failed to create Maya checkout session."); },
+          onSuccess: (data) => {
+            if (data?.checkoutUrl) {
+              window.location.href = data.checkoutUrl;
+              return;
+            }
+            toast.error("Maya checkout URL was not returned.");
+          },
+          onError: () => {
+            toast.error("Failed to create Maya checkout session.");
+          },
         },
       );
-    } else if (targetProvider === "paymongo") {
+      return;
+    }
+
+    if (targetProvider === "paymongo") {
       if (paymongoEnabled && !mayaEnabled) {
         createPaymongoCheckout.mutate(
           {
-            lineItems: [{ name: "Wallet Deposit", quantity: 1, amount: Math.round(numAmount * 100), currency: "PHP", description: `Agency wallet deposit` }],
+            lineItems: [
+              {
+                name: "Wallet Deposit",
+                quantity: 1,
+                amount: Math.round(numAmount * 100),
+                currency: "PHP",
+                description: "Agency wallet deposit",
+              },
+            ],
             paymentMethodTypes: ["gcash", "paymaya", "card", "dob", "qrph", "grab_pay"],
             successUrl: `${window.location.origin}/dashboard/wallet?success=true`,
             cancelUrl: `${window.location.origin}/dashboard/wallet?canceled=true`,
           },
           {
-            onSuccess: (data) => { if (data?.checkoutUrl) window.location.href = data.checkoutUrl; },
-            onError: () => { toast.error("Failed to create PayMongo checkout session."); },
+            onSuccess: (data) => {
+              if (data?.checkoutUrl) {
+                window.location.href = data.checkoutUrl;
+                return;
+              }
+              toast.error("PayMongo checkout URL was not returned.");
+            },
+            onError: () => {
+              toast.error("Failed to create PayMongo checkout session.");
+            },
           },
         );
-      } else {
-        initiatePaymongoPayment.mutate(
-          { amount: numAmount, paymentMethodType: targetMethod, returnUrl: `${window.location.origin}/dashboard/wallet?success=true`, billing: { name: "Travel Agent", email: "agent@ayahay.com" } },
-          {
-            onSuccess: (data) => { if (data?.redirectUrl) window.location.href = data.redirectUrl; },
-            onError: () => { toast.error("Failed to initiate PayMongo payment."); },
-          },
-        );
+        return;
       }
+
+      initiatePaymongoPayment.mutate(
+        {
+          amount: numAmount,
+          paymentMethodType: targetMethod,
+          returnUrl: `${window.location.origin}/dashboard/wallet?success=true`,
+          billing: {
+            name: "Travel Agent",
+            email: "agent@ayahay.com",
+          },
+        },
+        {
+          onSuccess: (data) => {
+            if (data?.redirectUrl) {
+              window.location.href = data.redirectUrl;
+              return;
+            }
+            toast.error("PayMongo redirect URL was not returned.");
+          },
+          onError: () => {
+            toast.error("Failed to initiate PayMongo payment.");
+          },
+        },
+      );
     }
   };
 
@@ -263,15 +337,39 @@ function DepositDialog({
   const instantMethods = [
     { id: "gcash", name: "GCash", logo: "/GCash_logo.svg.png", provider: "paymongo" },
     { id: "paymaya", name: "Maya", logo: "/Maya_logo.svg.png", provider: "paymongo" },
-    { id: "grab_pay", name: "Grab", logo: "/grab-pay-logo-png_seeklogo-371015.png", provider: "paymongo" },
+    {
+      id: "grab_pay",
+      name: "Grab",
+      logo: "/grab-pay-logo-png_seeklogo-371015.png",
+      provider: "paymongo",
+    },
     { id: "qrph", name: "QRPh", logo: "/QR_Ph_Logo.svg.png", provider: "paymongo" },
     { id: "card", name: "Card", logo: "/atm-card.png", provider: mayaEnabled ? "maya" : "paymongo" },
-  ];
+  ] as const;
+
+  const availableInstantMethods = instantMethods.filter((pm) =>
+    pm.provider === "maya" ? !!mayaEnabled : !!paymongoEnabled,
+  );
 
   const manualMethods = [
-    { id: "GCash", name: "GCash", logo: "/GCash_logo.svg.png", instructions: "Transfer to 09XXXXXXXX and save the receipt." },
-    { id: "Bank Transfer", name: "Bank", logo: "/transference.png", instructions: "BDO: Ayahay Inc. 1234567890" },
-    { id: "Cash", name: "OTC", logo: "/ayahay-icon.png", instructions: "Visit our office at Ayahay Main." },
+    {
+      id: "GCash",
+      name: "GCash",
+      logo: "/GCash_logo.svg.png",
+      instructions: "Transfer to 09XXXXXXXX and save the receipt.",
+    },
+    {
+      id: "Bank Transfer",
+      name: "Bank",
+      logo: "/transference.png",
+      instructions: "BDO: Ayahay Inc. 1234567890",
+    },
+    {
+      id: "Cash",
+      name: "OTC",
+      logo: "/ayahay-icon.png",
+      instructions: "Visit our office at Ayahay Main.",
+    },
   ];
 
   return (
@@ -290,10 +388,14 @@ function DepositDialog({
           <DialogDescription>
             {step === "amount" && "Enter the amount you wish to deposit."}
             {step === "type" && "Choose between instant or manual payment."}
-            {step === "instant_method" && "Select your preferred instant payment method."}
-            {step === "manual_method" && "Select your preferred manual payment method."}
-            {step === "manual_details" && "Transfer funds externally and then provide the details below."}
-            {step === "success" && "Your request is now for verification by our admins."}
+            {step === "instant_method" &&
+              "Select your preferred instant payment method."}
+            {step === "manual_method" &&
+              "Select your preferred manual payment method."}
+            {step === "manual_details" &&
+              "Transfer funds externally and then provide the details below."}
+            {step === "success" &&
+              "Your request is now for verification by our admins."}
           </DialogDescription>
         </DialogHeader>
 
@@ -302,7 +404,9 @@ function DepositDialog({
             <div className="grid gap-2">
               <Label htmlFor="deposit-amount">Enter Amount</Label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-muted-foreground font-bold">{"\u20B1"}</span>
+                <span className="absolute left-3 top-2.5 font-bold text-muted-foreground">
+                  {"\u20B1"}
+                </span>
                 <Input
                   id="deposit-amount"
                   type="number"
@@ -328,10 +432,11 @@ function DepositDialog({
                   key={val}
                   variant="outline"
                   size="sm"
-                  className="text-xs h-8"
+                  className="h-8 text-xs"
                   onClick={() => setAmount(val.toString())}
                 >
-                  {"\u20B1"}{val.toLocaleString()}
+                  {"\u20B1"}
+                  {val.toLocaleString()}
                 </Button>
               ))}
             </div>
@@ -339,7 +444,7 @@ function DepositDialog({
             <Button
               onClick={() => setStep("type")}
               disabled={Number(amount) <= 0}
-              className="w-full h-11"
+              className="h-11 w-full"
             >
               Continue
             </Button>
@@ -350,26 +455,30 @@ function DepositDialog({
           <div className="grid grid-cols-2 gap-4 py-4">
             <button
               onClick={() => setStep("instant_method")}
-              className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-muted hover:border-primary hover:bg-primary/5 transition-all group"
+              className="group flex flex-col items-center gap-3 rounded-xl border-2 border-muted p-6 transition-all hover:border-primary hover:bg-primary/5"
             >
-              <div className="p-3 rounded-full bg-primary/10 text-primary group-hover:scale-110 transition-transform">
+              <div className="rounded-full bg-primary/10 p-3 text-primary transition-transform group-hover:scale-110">
                 <IconRefresh className="size-8" />
               </div>
               <div className="text-center">
-                <span className="font-bold block">Instant Payment</span>
-                <span className="text-xs text-muted-foreground">Pay via PayMongo/Maya</span>
+                <span className="block font-bold">Instant Payment</span>
+                <span className="text-xs text-muted-foreground">
+                  Pay via PayMongo or Maya
+                </span>
               </div>
             </button>
             <button
               onClick={() => setStep("manual_method")}
-              className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-muted hover:border-orange-500 hover:bg-orange-50 transition-all group"
+              className="group flex flex-col items-center gap-3 rounded-xl border-2 border-muted p-6 transition-all hover:border-orange-500 hover:bg-orange-50"
             >
-              <div className="p-3 rounded-full bg-orange-100 text-orange-600 group-hover:scale-110 transition-transform">
+              <div className="rounded-full bg-orange-100 p-3 text-orange-600 transition-transform group-hover:scale-110">
                 <IconReceipt className="size-8" />
               </div>
               <div className="text-center">
-                <span className="font-bold block">Manual Payment</span>
-                <span className="text-xs text-muted-foreground">GCash, Bank, Cash, etc.</span>
+                <span className="block font-bold">Manual Payment</span>
+                <span className="text-xs text-muted-foreground">
+                  GCash, bank transfer, or cash
+                </span>
               </div>
             </button>
           </div>
@@ -378,20 +487,24 @@ function DepositDialog({
         {step === "instant_method" && (
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-3 gap-3">
-              {instantMethods.map((pm) => (
+              {availableInstantMethods.map((pm) => (
                 <button
                   key={pm.id}
                   onClick={() => setMethod(pm.id)}
-                  className={`group relative flex flex-col items-center gap-2 p-3 rounded-xl border transition-all hover:bg-accent ${
-                    method === pm.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-transparent bg-muted/30"
+                  className={`group relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-all hover:bg-accent ${
+                    method === pm.id
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "border-transparent bg-muted/30"
                   }`}
                 >
-                  <div className="size-14 rounded-xl bg-white border border-muted p-2.5 flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                  <div className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-muted bg-white p-2.5 shadow-sm transition-transform group-hover:scale-105">
                     <img src={pm.logo} alt={pm.name} className="size-full object-contain" />
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{pm.name}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {pm.name}
+                  </span>
                   {method === pm.id && (
-                    <div className="absolute -top-1 -right-1 size-5 rounded-full bg-primary flex items-center justify-center shadow-sm">
+                    <div className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-primary shadow-sm">
                       <IconCheck className="size-3 text-white" strokeWidth={3} />
                     </div>
                   )}
@@ -399,11 +512,18 @@ function DepositDialog({
               ))}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep("type")}>Back</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setStep("type")}>
+                Back
+              </Button>
               <Button
                 className="flex-2"
                 onClick={handleInstantDeposit}
-                disabled={!method || isPending}
+                disabled={
+                  isPending ||
+                  providersLoading ||
+                  (!paymongoEnabled && !mayaEnabled) ||
+                  (paymongoEnabled && mayaEnabled && !method)
+                }
               >
                 {isPending ? "Connecting..." : "Proceed"}
               </Button>
@@ -418,18 +538,20 @@ function DepositDialog({
                 <button
                   key={pm.id}
                   onClick={() => setManualMethod(pm.id)}
-                  className={`group relative flex flex-col items-center gap-2 p-3 rounded-xl border transition-all hover:bg-accent/50 ${
-                    manualMethod === pm.id ? "border-orange-500 bg-orange-50 ring-1 ring-orange-500" : "border-transparent bg-muted/30"
+                  className={`group relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-all hover:bg-accent/50 ${
+                    manualMethod === pm.id
+                      ? "border-orange-500 bg-orange-50 ring-1 ring-orange-500"
+                      : "border-transparent bg-muted/30"
                   }`}
                 >
-                  <div className="size-14 rounded-xl bg-white border border-muted p-2.5 flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                  <div className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-muted bg-white p-2.5 shadow-sm transition-transform group-hover:scale-105">
                     <img src={pm.logo} alt={pm.name} className="size-full object-contain" />
                   </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{pm.name}</span>
-                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {pm.name}
+                  </span>
                   {manualMethod === pm.id && (
-                    <div className="absolute -top-1 -right-1 size-5 rounded-full bg-orange-500 flex items-center justify-center shadow-sm">
+                    <div className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-orange-500 shadow-sm">
                       <IconCheck className="size-3 text-white" strokeWidth={3} />
                     </div>
                   )}
@@ -438,15 +560,19 @@ function DepositDialog({
             </div>
 
             {manualMethod && (
-              <div className="rounded-lg bg-orange-50/50 border border-orange-100 p-3 mt-2">
-                <p className="text-[10px] uppercase font-bold text-orange-900 mb-1 opacity-60">Instructions</p>
-                <p className="text-xs text-orange-800 font-medium">
+              <div className="mt-2 rounded-lg border border-orange-100 bg-orange-50/50 p-3">
+                <p className="mb-1 text-[10px] font-bold uppercase text-orange-900 opacity-60">
+                  Instructions
+                </p>
+                <p className="text-xs font-medium text-orange-800">
                   {manualMethods.find((m) => m.id === manualMethod)?.instructions}
                 </p>
               </div>
             )}
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep("type")}>Back</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setStep("type")}>
+                Back
+              </Button>
               <Button
                 className="flex-2 bg-orange-600 hover:bg-orange-700"
                 onClick={() => setStep("manual_details")}
@@ -460,10 +586,12 @@ function DepositDialog({
 
         {step === "manual_details" && (
           <div className="grid gap-4 py-4">
-            <div className="rounded-lg bg-orange-50 border border-orange-100 p-3 flex gap-2 items-start mb-2">
-              <IconReceipt className="size-5 text-orange-600 mt-0.5 shrink-0" />
+            <div className="mb-2 flex items-start gap-2 rounded-lg border border-orange-100 bg-orange-50 p-3">
+              <IconReceipt className="mt-0.5 size-5 shrink-0 text-orange-600" />
               <div>
-                <p className="text-sm font-bold text-orange-900">Uploading proof for {manualMethod}</p>
+                <p className="text-sm font-bold text-orange-900">
+                  Uploading proof for {manualMethod}
+                </p>
                 <p className="text-xs text-orange-800">Amount: {formatCurrency(amount)}</p>
               </div>
             </div>
@@ -486,8 +614,14 @@ function DepositDialog({
                 onChange={(e) => setProofFile(e.target.files?.[0] || null)}
               />
             </div>
-            <div className="flex gap-2 mt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setStep("manual_method")}>Back</Button>
+            <div className="mt-2 flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setStep("manual_method")}
+              >
+                Back
+              </Button>
               <Button
                 className="flex-2 bg-green-600 hover:bg-green-700"
                 onClick={handleManualSubmit}
@@ -500,14 +634,15 @@ function DepositDialog({
         )}
 
         {step === "success" && (
-          <div className="py-8 text-center space-y-4">
-            <div className="mx-auto size-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+          <div className="space-y-4 py-8 text-center">
+            <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-green-100 text-green-600">
               <IconReceipt className="size-8" />
             </div>
             <div>
               <p className="text-lg font-bold">Verification Pending</p>
-              <p className="text-sm text-muted-foreground px-8">
-                We've received your deposit request. Please wait while our team verifies your payment.
+              <p className="px-8 text-sm text-muted-foreground">
+                We received your deposit request. Please wait while our team verifies
+                your payment.
               </p>
             </div>
             <Button onClick={() => setOpen(false)} className="w-full">
@@ -578,8 +713,7 @@ function WithdrawDialog({
               />
               {exceedsBalance && (
                 <p className="text-xs text-destructive">
-                  Amount exceeds the current balance of{" "}
-                  {formatCurrency(currentBalance)}
+                  Amount exceeds the current balance of {formatCurrency(currentBalance)}
                 </p>
               )}
             </div>
@@ -635,24 +769,26 @@ function WithdrawDialog({
 
 export default function WalletPage() {
   const currentUser = useAuthStore((s) => s.user);
-  const [successMsg, setSuccessMsg] = useState(() => {
-    if (typeof window === "undefined") return false;
+  const [successMsg, setSuccessMsg] = useState(false);
+  const [canceledMsg, setCanceledMsg] = useState(false);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("success") === "true") {
-      window.history.replaceState(null, "", window.location.pathname);
-      return true;
+    const hasSuccess = params.get("success") === "true";
+    const hasCanceled = params.get("canceled") === "true";
+
+    if (hasSuccess) {
+      setSuccessMsg(true);
     }
-    return false;
-  });
-  const [canceledMsg, setCanceledMsg] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("canceled") === "true") {
-      window.history.replaceState(null, "", window.location.pathname);
-      return true;
+
+    if (hasCanceled) {
+      setCanceledMsg(true);
     }
-    return false;
-  });
+
+    if (hasSuccess || hasCanceled) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   const { data, isLoading, refetch, isRefetching } = useAgencyWallet(
     currentUser?.travel_agency_id,
@@ -681,14 +817,18 @@ export default function WalletPage() {
     <TooltipProvider>
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
         {successMsg && (
-          <div className="rounded-md bg-green-50 p-4 border border-green-200">
+          <div className="rounded-md border border-green-200 bg-green-50 p-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <IconCircleCheck className="size-5 text-green-400" aria-hidden="true" />
+                <IconCircleCheck
+                  className="size-5 text-green-400"
+                  aria-hidden="true"
+                />
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-green-800">
-                  Payment successful! Your deposit is complete. The funds may take a moment to reflect in your wallet balance.
+                  Payment successful. Your deposit is complete and may take a moment
+                  to reflect in your wallet balance.
                 </p>
               </div>
               <div className="ml-auto pl-3">
@@ -706,10 +846,13 @@ export default function WalletPage() {
         )}
 
         {canceledMsg && (
-          <div className="rounded-md bg-yellow-50 p-4 border border-yellow-200">
+          <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <IconAlertCircle className="size-5 text-yellow-400" aria-hidden="true" />
+                <IconAlertCircle
+                  className="size-5 text-yellow-400"
+                  aria-hidden="true"
+                />
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-yellow-800">
@@ -730,7 +873,6 @@ export default function WalletPage() {
           </div>
         )}
 
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
@@ -745,9 +887,7 @@ export default function WalletPage() {
                   agentId={currentUser.id}
                   agencyId={currentUser.travel_agency_id}
                 />
-                {isAdmin && (
-                  <WithdrawDialog currentBalance={currentBalance} />
-                )}
+                {isAdmin && <WithdrawDialog currentBalance={currentBalance} />}
               </>
             )}
             <Button
@@ -763,7 +903,6 @@ export default function WalletPage() {
           </div>
         </div>
 
-        {/* Balance Cards */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -777,7 +916,7 @@ export default function WalletPage() {
                 {formatCurrency(currentBalance)}
               </div>
               {balance?.last_transaction && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Last transaction: {formatDate(balance.last_transaction)}
                 </p>
               )}
@@ -795,7 +934,7 @@ export default function WalletPage() {
               <div className="text-2xl font-bold text-green-600">
                 {formatCurrency(balance?.total_deposits)}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {balance?.transaction_count ?? 0} total transactions
               </p>
             </CardContent>
@@ -810,14 +949,13 @@ export default function WalletPage() {
               <div className="text-2xl font-bold text-red-600">
                 {formatCurrency(balance?.total_usage)}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Bookings, withdrawals &amp; fees
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Wallet History */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">Wallet History</CardTitle>
@@ -871,7 +1009,8 @@ export default function WalletPage() {
 
               <TabsContent value="deposits" className="animate-in fade-in-0 duration-200">
                 <div className="py-8 text-center text-xs italic text-muted-foreground">
-                  Manual deposit request tracking will be available once deposit requests are submitted.
+                  Manual deposit request tracking will be available once deposit
+                  requests are submitted.
                 </div>
               </TabsContent>
             </Tabs>

@@ -81,7 +81,6 @@ export interface WithdrawalRequestPayload {
 }
 
 // ==================== Payment Provider ====================
-
 export interface PaymentProvider {
   id: number;
   code: string;
