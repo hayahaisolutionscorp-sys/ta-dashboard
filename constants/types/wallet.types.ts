@@ -1,9 +1,7 @@
-// ==================== Wallet Balance ====================
+// ==================== Wallet Balance (per agency) ====================
 
 export interface WalletBalance {
-  travel_agent_id: string;
-  travel_agent_name: string;
-  travel_agent_email: string;
+  travel_agency_id: number;
   agency_name: string;
   transaction_count: number;
   balance: number;
@@ -16,16 +14,17 @@ export interface WalletBalance {
 
 export interface WalletActivity {
   id: number;
-  travel_agent_id: string;
-  travel_agency_id: number | null;
+  travel_agent_id: string | null;
+  travel_agency_id: number;
   booking_id: string | null;
   amount: number;
   reference_code: string;
   transaction_type: "deposit" | "usage";
   created_at: string;
+  performed_by: string | null;
 }
 
-export interface AgentWalletResponse {
+export interface AgencyWalletResponse {
   balance: WalletBalance | null;
   activities: WalletActivity[];
 }
@@ -35,7 +34,7 @@ export interface AgentWalletResponse {
 export interface WithdrawalRequest {
   id: number;
   travel_agent_id: string;
-  travel_agency_id: number | null;
+  travel_agency_id: number;
   amount: number;
   status: "pending" | "approved" | "rejected" | "cancelled";
   rejection_reason: string | null;
@@ -46,13 +45,9 @@ export interface WithdrawalRequest {
 // ==================== DTOs ====================
 
 export interface DepositPayload {
-  travel_agent_id: string;
-  travel_agency_id?: number;
   amount: number;
 }
 
 export interface WithdrawalRequestPayload {
-  travel_agent_id: string;
-  travel_agency_id?: number;
   amount: number;
 }

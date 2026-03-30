@@ -24,3 +24,10 @@ export interface UpdateMarkupPayload {
   flat_cargo_markup?: number;
   percentage_cargo_markup?: number;
 }
+
+export interface AgencyAgent {
+  id: string;
+  travel_agent_name: string;
+  email: string;
+  role: "Admin" | "Staff";
+}

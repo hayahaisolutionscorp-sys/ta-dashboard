@@ -166,6 +166,7 @@ export interface BookingView {
   issued_by?: string;
   booked_by_id?: string;
   booked_by_travel_agent_id?: string;
+  booked_by_agent_name?: string;
   first_departure?: string;
   last_arrival?: string;
   ships_used?: string;

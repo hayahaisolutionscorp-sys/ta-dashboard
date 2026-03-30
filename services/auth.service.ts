@@ -58,6 +58,7 @@ interface LoginResponse {
     display_name: string;
     agency_name?: string;
     travel_agency_id?: number;
+    role?: "Admin" | "Staff";
   };
 }
 
@@ -66,6 +67,7 @@ interface ProfileResponse {
   display_name: string;
   agency_name?: string;
   travel_agency_id?: number;
+  role?: "Admin" | "Staff";
 }
 
 // Auth API endpoints
@@ -120,6 +122,7 @@ function mapBackendUserToStoreUser(backendUser: LoginResponse["user"]): User {
         ? backendUser.address
         : "",
     travel_agency_id: backendUser.travel_agency_id ?? null,
+    role: ("role" in backendUser && (backendUser.role as "Admin" | "Staff")) || "Staff",
   };
 }
 

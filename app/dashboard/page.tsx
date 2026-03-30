@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { useBookings } from "@/hooks/queries/bookings/use-bookings";
 import { useRoutesForAgency } from "@/hooks/queries/routes/use-routes";
-import { useAgentWallet } from "@/hooks/queries/wallet/use-wallet";
+import { useAgencyWallet } from "@/hooks/queries/wallet/use-wallet";
 
 function formatCurrency(value: number | string | null | undefined): string {
   const num = Number(value ?? 0);
@@ -35,10 +35,13 @@ function statusVariant(status: string) {
 export default function DashboardPage() {
   const currentUser = useAuthStore((s) => s.user);
 
+  const isAdmin = currentUser?.role === "Admin";
+
   const { data: bookingsData, isLoading: bookingsLoading } = useBookings({
     page: 1,
     page_size: 5,
-    userId: currentUser?.id,
+    // Admin sees all agency bookings on dashboard; Staff sees only their own
+    userId: isAdmin ? undefined : currentUser?.id,
     agencyId: currentUser?.travel_agency_id,
   });
 
@@ -46,8 +49,8 @@ export default function DashboardPage() {
     currentUser?.travel_agency_id,
   );
 
-  const { data: walletData, isLoading: walletLoading } = useAgentWallet(
-    currentUser?.id,
+  const { data: walletData, isLoading: walletLoading } = useAgencyWallet(
+    currentUser?.travel_agency_id,
   );
 
   const totalBookings = bookingsData?.total ?? 0;

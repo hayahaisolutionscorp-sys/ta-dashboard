@@ -3,7 +3,7 @@
 import { useFormContext } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
 import { IconWallet, IconCreditCard, IconAlertCircle } from "@tabler/icons-react";
-import { useAgentWallet } from "@/hooks/queries/wallet/use-wallet";
+import { useAgencyWallet } from "@/hooks/queries/wallet/use-wallet";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import type { BookingFormData } from "@/lib/validators/booking.validators";
 
@@ -20,8 +20,8 @@ export default function PaymentMethodSection({
 }: PaymentMethodSectionProps) {
   const { setValue, watch } = useFormContext<BookingFormData>();
   const currentUser = useAuthStore((s) => s.user);
-  const { data: walletData, isLoading: isWalletLoading } = useAgentWallet(
-    currentUser?.id,
+  const { data: walletData, isLoading: isWalletLoading } = useAgencyWallet(
+    currentUser?.travel_agency_id,
   );
 
   const selectedMethod = watch("paymentMethod");

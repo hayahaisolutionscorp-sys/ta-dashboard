@@ -8,6 +8,7 @@ export interface User {
   contact_number: string;
   address: string;
   travel_agency_id: number | null;
+  role: "Admin" | "Staff";
 }
 
 interface AuthState {

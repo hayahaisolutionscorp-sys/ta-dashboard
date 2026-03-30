@@ -13,6 +13,7 @@ import {
   IconLogout,
   IconZoomMoney,
   IconWallet,
+  IconUsers,
 } from "@tabler/icons-react";
 
 import {
@@ -55,6 +56,12 @@ const navItems = [
     title: "Wallet",
     url: "/dashboard/wallet",
     icon: IconWallet,
+  },
+  {
+    title: "Staff",
+    url: "/dashboard/staff",
+    icon: IconUsers,
+    requiredRole: "Admin" as const,
   },
 ];
 
@@ -113,20 +120,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.url}
-                    tooltip={item.title}
-                  >
-                    <Link href={item.url}>
-                      <item.icon className="size-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navItems
+                .filter(
+                  (item) =>
+                    !("requiredRole" in item) ||
+                    item.requiredRole === user?.role,
+                )
+                .map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.url}
+                      tooltip={item.title}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

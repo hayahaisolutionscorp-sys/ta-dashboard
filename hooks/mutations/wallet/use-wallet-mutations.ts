@@ -2,8 +2,8 @@
  * Wallet mutation hooks.
  *
  *  useDeposit()
- *    Credits funds to an agent's wallet. Called by agency admins.
- *    On success, invalidates the ["wallet", agentId] cache so the
+ *    Credits funds to the agency wallet. Called by Admin agents.
+ *    On success, invalidates the ["wallet", "agency"] cache so the
  *    wallet page balance and activity list refresh immediately.
  *
  *  useRequestWithdrawal()
@@ -23,9 +23,9 @@ export function useDeposit() {
 
   return useMutation({
     mutationFn: (payload: DepositPayload) => walletService.deposit(payload),
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["wallet", variables.travel_agent_id],
+        queryKey: ["wallet", "agency"],
       });
     },
   });
@@ -37,9 +37,9 @@ export function useRequestWithdrawal() {
   return useMutation({
     mutationFn: (payload: WithdrawalRequestPayload) =>
       walletService.requestWithdrawal(payload),
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["wallet", variables.travel_agent_id],
+        queryKey: ["wallet", "agency"],
       });
     },
   });

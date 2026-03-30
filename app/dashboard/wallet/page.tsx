@@ -24,7 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAuthStore } from "@/lib/stores/auth.store";
-import { useAgentWallet } from "@/hooks/queries/wallet/use-wallet";
+import { useAgencyWallet } from "@/hooks/queries/wallet/use-wallet";
 import {
   useDeposit,
   useRequestWithdrawal,
@@ -75,7 +75,8 @@ function TransactionRow({ activity }: { activity: WalletActivity }) {
             {referenceLabel(activity.reference_code)}
           </p>
           <p className="text-xs text-muted-foreground">
-            {activity.reference_code}
+            {activity.performed_by ? `By ${activity.performed_by}` : "System"}{" "}
+            &middot; {activity.reference_code}
           </p>
         </div>
       </div>
@@ -93,14 +94,8 @@ function TransactionRow({ activity }: { activity: WalletActivity }) {
     </div>
   );
 }
-// would like to add actual online transaction here
-function DepositDialog({
-  agentId,
-  agencyId,
-}: {
-  agentId: string;
-  agencyId: number | null;
-}) {
+
+function DepositDialog() {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const depositMutation = useDeposit();
@@ -109,11 +104,7 @@ function DepositDialog({
     const numAmount = Number(amount);
     if (numAmount <= 0) return;
     depositMutation.mutate(
-      {
-        travel_agent_id: agentId,
-        travel_agency_id: agencyId ?? undefined,
-        amount: numAmount,
-      },
+      { amount: numAmount },
       {
         onSuccess: () => {
           setAmount("");
@@ -135,7 +126,7 @@ function DepositDialog({
         <DialogHeader>
           <DialogTitle>Make a Deposit</DialogTitle>
           <DialogDescription>
-            Add funds to your travel agency wallet.
+            Add funds to your agency wallet.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -174,12 +165,8 @@ function DepositDialog({
 }
 
 function WithdrawDialog({
-  agentId,
-  agencyId,
   currentBalance,
 }: {
-  agentId: string;
-  agencyId: number | null;
   currentBalance: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -193,11 +180,7 @@ function WithdrawDialog({
   const handleWithdraw = () => {
     if (numAmount <= 0 || exceedsBalance) return;
     withdrawMutation.mutate(
-      {
-        travel_agent_id: agentId,
-        travel_agency_id: agencyId ?? undefined,
-        amount: numAmount,
-      },
+      { amount: numAmount },
       {
         onSuccess: () => {
           setAmount("");
@@ -239,7 +222,7 @@ function WithdrawDialog({
               />
               {exceedsBalance && (
                 <p className="text-xs text-destructive">
-                  Amount exceeds your current balance of{" "}
+                  Amount exceeds the current balance of{" "}
                   {formatCurrency(currentBalance)}
                 </p>
               )}
@@ -296,13 +279,14 @@ function WithdrawDialog({
 
 export default function WalletPage() {
   const currentUser = useAuthStore((s) => s.user);
-  const { data, isLoading, refetch, isRefetching } = useAgentWallet(
-    currentUser?.id,
+  const { data, isLoading, refetch, isRefetching } = useAgencyWallet(
+    currentUser?.travel_agency_id,
   );
 
   const balance = data?.balance;
   const activities = data?.activities ?? [];
   const currentBalance = Number(balance?.balance ?? 0);
+  const isAdmin = currentUser?.role === "Admin";
 
   if (isLoading) {
     return (
@@ -325,21 +309,14 @@ export default function WalletPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Wallet</h1>
           <p className="text-muted-foreground">
-            Manage your wallet balance and transactions.
+            Manage your agency wallet balance and transactions.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {currentUser?.id && (
+          {isAdmin && (
             <>
-              <DepositDialog
-                agentId={currentUser.id}
-                agencyId={currentUser.travel_agency_id}
-              />
-              <WithdrawDialog
-                agentId={currentUser.id}
-                agencyId={currentUser.travel_agency_id}
-                currentBalance={currentBalance}
-              />
+              <DepositDialog />
+              <WithdrawDialog currentBalance={currentBalance} />
             </>
           )}
           <Button
