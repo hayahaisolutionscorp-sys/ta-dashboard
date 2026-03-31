@@ -14,6 +14,7 @@ import {
   IconZoomMoney,
   IconWallet,
   IconUsers,
+  IconReportAnalytics,
 } from "@tabler/icons-react";
 
 import {
@@ -56,6 +57,12 @@ const navItems = [
     title: "Wallet",
     url: "/dashboard/wallet",
     icon: IconWallet,
+  },
+  {
+    title: "Reports",
+    url: "/dashboard/reports",
+    icon: IconReportAnalytics,
+    requiredRole: "Admin" as const,
   },
   {
     title: "Staff",

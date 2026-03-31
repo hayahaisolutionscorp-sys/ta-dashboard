@@ -77,4 +77,10 @@ export const TRAVEL_AGENCY_API = {
     DEPOSIT: "/travel-agency-wallet/deposit",
     WITHDRAWAL_REQUEST: "/travel-agency-wallet/withdrawal-request",
   },
+  REPORTS: {
+    AGENCY_PERFORMANCE: "/travel-agency-reports/agency-performance",
+    STAFF_PERFORMANCE: "/travel-agency-reports/staff-performance",
+    AGENCY_PERFORMANCE_DATA: "/travel-agency-reports/agency-performance/data",
+    STAFF_PERFORMANCE_DATA: "/travel-agency-reports/staff-performance/data",
+  },
 };
