@@ -71,6 +71,10 @@ export const TRAVEL_AGENCY_API = {
     BY_AGENT: (agentId: string) => `/travel-agency-wallet/agent/${agentId}`,
     DEPOSIT: "/travel-agency-wallet/deposit",
     WITHDRAWAL_REQUEST: "/travel-agency-wallet/withdrawal-request",
+    MANUAL_DEPOSIT: "/travel-agency-wallet/manual-deposit",
+  },
+  MEDIA: {
+    UPLOAD_VERIFICATION: "/upload/verification-document",
   },
   PAYMENTS: {
     CHECKOUT_SESSION: "/v2/payments/paymongo/checkout-session",

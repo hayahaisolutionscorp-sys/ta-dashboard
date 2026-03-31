@@ -63,3 +63,22 @@ export function useCreateMayaCheckout() {
     mutationFn: (payload: any) => walletService.createMayaCheckout(payload),
   });
 }
+
+export function useRequestManualDeposit() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: any) => walletService.requestManualDeposit(payload),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["wallet", variables.travel_agent_id],
+      });
+    },
+  });
+}
+
+export function useUploadDepositProof() {
+  return useMutation({
+    mutationFn: (file: File) => walletService.uploadProofOfPayment(file),
+  });
+}

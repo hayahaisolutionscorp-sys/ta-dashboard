@@ -25,9 +25,45 @@ export interface WalletActivity {
   created_at: string;
 }
 
+export interface ManualDepositRequest {
+  id: number;
+  travel_agent_id: string;
+  travel_agency_id: number | null;
+  amount: number;
+  payment_method: string;
+  user_reference_number: string;
+  proof_url: string | null;
+  status: "for_verification" | "success" | "rejected";
+  rejection_reason?: string | null;
+  admin_id?: string | null;
+  processed_by_name?: string | null;
+  processed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedResponse<T> {
+  results: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+export interface AgentWalletQueryParams {
+  activityPage?: number;
+  activityPageSize?: number;
+  depositPage?: number;
+  depositPageSize?: number;
+  depositStatus?: "active" | "for_verification" | "rejected" | "success" | "all";
+}
+
 export interface AgentWalletResponse {
   balance: WalletBalance | null;
-  activities: WalletActivity[];
+  activities: PaginatedResponse<WalletActivity>;
+  manualDeposits: PaginatedResponse<ManualDepositRequest>;
 }
 
 // ==================== Withdrawal Request ====================

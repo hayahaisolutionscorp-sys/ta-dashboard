@@ -8,11 +8,15 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { walletService } from "@/services/wallet.service";
+import type { AgentWalletQueryParams } from "@/constants/types/wallet.types";
 
-export function useAgentWallet(agentId: string | null | undefined) {
+export function useAgentWallet(
+  agentId: string | null | undefined,
+  params?: AgentWalletQueryParams,
+) {
   return useQuery({
-    queryKey: ["wallet", agentId],
-    queryFn: () => walletService.getAgentWallet(agentId!),
+    queryKey: ["wallet", agentId, params],
+    queryFn: () => walletService.getAgentWallet(agentId!, params),
     enabled: !!agentId,
   });
 }
