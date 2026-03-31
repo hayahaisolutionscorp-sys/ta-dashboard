@@ -8,12 +8,24 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { walletService } from "@/services/wallet.service";
+import type { AgentWalletQueryParams } from "@/constants/types/wallet.types";
 
 export function useAgencyWallet(agencyId: number | null | undefined) {
   return useQuery({
     queryKey: ["wallet", "agency", agencyId],
     queryFn: () => walletService.getAgencyWallet(),
     enabled: !!agencyId,
+  });
+}
+
+export function useAgentWallet(
+  agentId: string | null | undefined,
+  params?: AgentWalletQueryParams,
+) {
+  return useQuery({
+    queryKey: ["wallet", "agent", agentId, params],
+    queryFn: () => walletService.getAgentWallet(agentId!, params),
+    enabled: !!agentId,
   });
 }
 

@@ -13,6 +13,8 @@ import { api } from "@/lib/api";
 import { TRAVEL_AGENCY_API } from "@/constants/api_config";
 import type {
   AgencyWalletResponse,
+  AgentWalletResponse,
+  AgentWalletQueryParams,
   DepositPayload,
   ManualDepositPayload,
   ManualDepositRequest,
@@ -27,6 +29,26 @@ class WalletService {
   async getAgencyWallet(): Promise<AgencyWalletResponse> {
     const response = await api.get<AgencyWalletResponse>(
       TRAVEL_AGENCY_API.WALLET.BY_AGENCY,
+    );
+    return response.data;
+  }
+
+  /** Fetch the agent's wallet balance and recent activity history. */
+  async getAgentWallet(
+    agentId: string,
+    params?: AgentWalletQueryParams,
+  ): Promise<AgentWalletResponse> {
+    const response = await api.get<AgentWalletResponse>(
+      TRAVEL_AGENCY_API.WALLET.BY_AGENT(agentId),
+      {
+        params: {
+          activity_page: params?.activityPage,
+          activity_page_size: params?.activityPageSize,
+          deposit_page: params?.depositPage,
+          deposit_page_size: params?.depositPageSize,
+          deposit_status: params?.depositStatus,
+        },
+      },
     );
     return response.data;
   }
