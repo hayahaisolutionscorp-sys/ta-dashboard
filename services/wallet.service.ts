@@ -18,10 +18,14 @@ import type {
   DepositPayload,
   ManualDepositPayload,
   ManualDepositRequest,
-  PaymentProvider,
+  CreateSplitDepositPayload,
+  CreateSplitDepositResponse,
+  SplitDepositTransactionDetails,
   WithdrawalRequest,
   WithdrawalRequestPayload,
   WalletActivity,
+  PaymentProvider,
+  DepositMethodConfig,
 } from "@/constants/types/wallet.types";
 
 class WalletService {
@@ -124,6 +128,44 @@ class WalletService {
     return response.data.data;
   }
 
+  /**
+   * Create a split wallet deposit with mixed instant/manual legs.
+   */
+  async createSplitDeposit(
+    payload: CreateSplitDepositPayload,
+  ): Promise<CreateSplitDepositResponse> {
+    const response = await api.post(
+      TRAVEL_AGENCY_API.PAYMENTS.SPLIT_DEPOSIT,
+      payload,
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Create a split wallet deposit where the instant leg is handled by Maya.
+   */
+  async createMayaSplitDeposit(
+    payload: CreateSplitDepositPayload,
+  ): Promise<CreateSplitDepositResponse> {
+    const response = await api.post(
+      TRAVEL_AGENCY_API.PAYMENTS.MAYA_SPLIT_DEPOSIT,
+      payload,
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Fetch split deposit status for return-page banner and progress tracking.
+   */
+  async getSplitDepositStatus(
+    splitTransactionId: string,
+  ): Promise<SplitDepositTransactionDetails> {
+    const response = await api.get(
+      TRAVEL_AGENCY_API.WALLET.SPLIT_STATUS(splitTransactionId),
+    );
+    return response.data;
+  }
+
   async uploadProofOfPayment(file: File): Promise<{ url: string }> {
     const formData = new FormData();
     formData.append("file", file);
@@ -138,6 +180,13 @@ class WalletService {
   async getEnabledProviders(): Promise<PaymentProvider[]> {
     const response = await api.get<PaymentProvider[]>(
       TRAVEL_AGENCY_API.PAYMENT_PROVIDERS.ENABLED,
+    );
+    return response.data;
+  }
+
+  async getDepositMethods(): Promise<DepositMethodConfig[]> {
+    const response = await api.get<DepositMethodConfig[]>(
+      TRAVEL_AGENCY_API.PAYMENT_PROVIDERS.DEPOSIT_METHODS,
     );
     return response.data;
   }

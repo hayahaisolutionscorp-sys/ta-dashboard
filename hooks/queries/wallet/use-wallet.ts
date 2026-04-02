@@ -37,3 +37,23 @@ export function useEnabledProviders() {
     gcTime: 0,
   });
 }
+
+export function useDepositMethods() {
+  return useQuery({
+    queryKey: ["payment-providers", "deposit-methods"],
+    queryFn: () => walletService.getDepositMethods(),
+    staleTime: 0,
+  });
+}
+
+export function useSplitDepositStatus(
+  splitTransactionId: string | null | undefined,
+  agentId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: ["wallet", "split", splitTransactionId, agentId],
+    queryFn: () => walletService.getSplitDepositStatus(splitTransactionId!),
+    enabled: !!splitTransactionId && !!agentId,
+    refetchInterval: 5000,
+  });
+}

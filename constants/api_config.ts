@@ -75,6 +75,8 @@ export const TRAVEL_AGENCY_API = {
   WALLET: {
     BY_AGENCY: "/travel-agency-wallet/agency",
     BY_AGENT: (agentId: string) => `/travel-agency-wallet/agent/${agentId}`,
+    SPLIT_STATUS: (splitTransactionId: string) =>
+      `/travel-agency-wallet/split-deposit/${splitTransactionId}`,
     DEPOSIT: "/travel-agency-wallet/deposit",
     WITHDRAWAL_REQUEST: "/travel-agency-wallet/withdrawal-request",
     MANUAL_DEPOSIT: "/travel-agency-wallet/manual-deposit",
@@ -85,10 +87,13 @@ export const TRAVEL_AGENCY_API = {
   PAYMENTS: {
     CHECKOUT_SESSION: "/v2/payments/paymongo/checkout-session",
     PAYMONGO_INITIATE: "/v2/payments/paymongo/initiate",
+    SPLIT_DEPOSIT: "/v2/payments/paymongo/split-deposit",
+    MAYA_SPLIT_DEPOSIT: "/v2/payments/maya/split-deposit",
     MAYA_CHECKOUT: "/v2/payments/maya/checkout",
   },
   PAYMENT_PROVIDERS: {
     ENABLED: "/payments/providers/enabled",
+    DEPOSIT_METHODS: "/payments/providers/deposit-methods",
   },
   REPORTS: {
     AGENCY_PERFORMANCE: "/travel-agency-reports/agency-performance",

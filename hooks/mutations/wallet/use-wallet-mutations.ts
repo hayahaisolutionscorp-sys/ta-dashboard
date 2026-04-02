@@ -14,6 +14,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { walletService } from "@/services/wallet.service";
 import type {
+  CreateSplitDepositPayload,
   DepositPayload,
   ManualDepositPayload,
   WithdrawalRequestPayload,
@@ -103,5 +104,29 @@ export function useRequestManualDeposit() {
 export function useUploadDepositProof() {
   return useMutation({
     mutationFn: (file: File) => walletService.uploadProofOfPayment(file),
+  });
+}
+
+export function useCreateSplitDeposit() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateSplitDepositPayload) =>
+      walletService.createSplitDeposit(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wallet"] });
+    },
+  });
+}
+
+export function useCreateMayaSplitDeposit() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateSplitDepositPayload) =>
+      walletService.createMayaSplitDeposit(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wallet"] });
+    },
   });
 }

@@ -114,3 +114,75 @@ export interface PaymentProvider {
   created_at: string;
   updated_at: string;
 }
+
+export interface DepositMethodConfig {
+  code: "gcash" | "paymaya" | "grabpay" | "qrph" | "cards" | "bank_transfer";
+  name: string;
+  kind: "instant" | "manual";
+  min_amount: number;
+  max_amount: number;
+  split_limit: number;
+  requires_reference: boolean;
+  requires_proof: boolean;
+  is_enabled: boolean;
+  provider_code: "paymongo" | "maya" | null;
+  gateway_method: string | null;
+}
+
+// ==================== Split Deposit ====================
+
+export interface SplitDepositLegPayload {
+  amount: number;
+  legType: "instant" | "manual";
+  paymentMethod: string;
+  paymentProvider?: string;
+  userReferenceNumber?: string;
+  proofUrl?: string;
+}
+
+export interface CreateSplitDepositPayload {
+  totalAmount: number;
+  legs: SplitDepositLegPayload[];
+  successUrl?: string;
+  cancelUrl?: string;
+}
+
+export interface CreateSplitDepositResponse {
+  splitTransactionId: string;
+  referenceCode: string;
+  totalAmount: number;
+  paidAmount: number;
+  status: "pending" | "partial_paid" | "fully_paid" | "failed" | "cancelled";
+  checkoutUrl?: string;
+  checkoutSessionId?: string;
+  requiresManualReview: boolean;
+}
+
+export interface SplitDepositLeg {
+  id: string;
+  split_transaction_id: string;
+  leg_order: number;
+  amount: number;
+  leg_type: "instant" | "manual";
+  provider_code: string | null;
+  payment_method: string | null;
+  status:
+    | "pending"
+    | "processing"
+    | "for_verification"
+    | "paid"
+    | "rejected"
+    | "failed"
+    | "expired";
+  checkout_session_id: string | null;
+  payment_intent_id: string | null;
+}
+
+export interface SplitDepositTransactionDetails {
+  id: string;
+  reference_code: string;
+  total_amount: number;
+  paid_amount: number;
+  status: "pending" | "partial_paid" | "fully_paid" | "failed" | "cancelled";
+  legs: SplitDepositLeg[];
+}
