@@ -42,6 +42,34 @@ export interface WithdrawalRequest {
   processed_at: string | null;
 }
 
+// ==================== Manual Deposit ====================
+
+export interface ManualDepositPayload {
+  travel_agent_id: string;
+  travel_agency_id?: number;
+  amount: number;
+  payment_method: string;
+  user_reference_number: string;
+  proof_url?: string;
+}
+
+export interface ManualDepositRequest {
+  id: number;
+  travel_agent_id: string;
+  travel_agency_id: number | null;
+  amount: number;
+  payment_method: string;
+  user_reference_number: string | null;
+  proof_url: string | null;
+  deposit_reference: string;
+  status: "for_verification" | "success" | "rejected";
+  rejection_reason?: string | null;
+  admin_id?: string | null;
+  processed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ==================== DTOs ====================
 
 export interface DepositPayload {
@@ -50,4 +78,15 @@ export interface DepositPayload {
 
 export interface WithdrawalRequestPayload {
   amount: number;
+}
+
+// ==================== Payment Provider ====================
+
+export interface PaymentProvider {
+  id: number;
+  code: string;
+  name: string;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }

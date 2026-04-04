@@ -16,3 +16,12 @@ export function useAgencyWallet(agencyId: number | null | undefined) {
     enabled: !!agencyId,
   });
 }
+
+export function useEnabledProviders() {
+  return useQuery({
+    queryKey: ["payment-providers", "enabled"],
+    queryFn: () => walletService.getEnabledProviders(),
+    staleTime: 0,
+    gcTime: 0,
+  });
+}

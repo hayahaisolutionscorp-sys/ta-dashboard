@@ -15,6 +15,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { walletService } from "@/services/wallet.service";
 import type {
   DepositPayload,
+  ManualDepositPayload,
   WithdrawalRequestPayload,
 } from "@/constants/types/wallet.types";
 
@@ -42,5 +43,46 @@ export function useRequestWithdrawal() {
         queryKey: ["wallet", "agency"],
       });
     },
+  });
+}
+
+export function useRequestManualDeposit() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: ManualDepositPayload) =>
+      walletService.requestManualDeposit(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["wallet", "agency"],
+      });
+    },
+  });
+}
+
+export function useCreatePaymongoCheckout() {
+  return useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      walletService.createPaymongoCheckoutSession(payload),
+  });
+}
+
+export function useInitiatePaymongoPayment() {
+  return useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      walletService.initiatePaymongoPayment(payload),
+  });
+}
+
+export function useCreateMayaCheckout() {
+  return useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      walletService.createMayaCheckout(payload),
+  });
+}
+
+export function useUploadDepositProof() {
+  return useMutation({
+    mutationFn: (file: File) => walletService.uploadProofOfPayment(file),
   });
 }
