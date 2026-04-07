@@ -60,6 +60,7 @@ export const TRAVEL_AGENCY_API = {
   },
   MARKUP: {
     CREATE: "/travel-agency-markup",
+    AGENCY_AGENTS: "/travel-agency-markup/agency-agents",
     BY_AGENT: (agentId: string) => `/travel-agency-markup/agent/${agentId}`,
     BY_ROUTE: (routeId: number) => `/travel-agency-markup/route/${routeId}`,
     BY_AGENT_AND_ROUTE: (agentId: string, routeId: number) =>
@@ -67,9 +68,31 @@ export const TRAVEL_AGENCY_API = {
     UPDATE: (agentId: string, routeId: number) =>
       `/travel-agency-markup/agent/${agentId}/route/${routeId}`,
   },
+  STAFF: {
+    REGISTER: "/travel-agency-markup/register-staff",
+    LIST_ALL: "/travel-agency-markup/agency-staff",
+  },
   WALLET: {
-    BY_AGENT: (agentId: string) => `/travel-agency-wallet/agent/${agentId}`,
+    BY_AGENCY: "/travel-agency-wallet/agency",
     DEPOSIT: "/travel-agency-wallet/deposit",
     WITHDRAWAL_REQUEST: "/travel-agency-wallet/withdrawal-request",
+    MANUAL_DEPOSIT: "/travel-agency-wallet/manual-deposit",
+  },
+  MEDIA: {
+    UPLOAD_VERIFICATION: "/upload/verification-document",
+  },
+  PAYMENTS: {
+    CHECKOUT_SESSION: "/v2/payments/paymongo/checkout-session",
+    PAYMONGO_INITIATE: "/v2/payments/paymongo/initiate",
+    MAYA_CHECKOUT: "/v2/payments/maya/checkout",
+  },
+  PAYMENT_PROVIDERS: {
+    ENABLED: "/payments/providers/enabled",
+  },
+  REPORTS: {
+    AGENCY_PERFORMANCE: "/travel-agency-reports/agency-performance",
+    STAFF_PERFORMANCE: "/travel-agency-reports/staff-performance",
+    AGENCY_PERFORMANCE_DATA: "/travel-agency-reports/agency-performance/data",
+    STAFF_PERFORMANCE_DATA: "/travel-agency-reports/staff-performance/data",
   },
 };

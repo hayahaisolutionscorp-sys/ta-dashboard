@@ -6,6 +6,6 @@ export function useBookings(params: FindBookingsQuery) {
   return useQuery({
     queryKey: ["bookings", params],
     queryFn: () => bookingService.findBookingsByAgent(params),
-    enabled: !!params.userId && params.agencyId != null && params.agencyId > 0,
+    enabled: params.agencyId != null && params.agencyId > 0,
   });
 }

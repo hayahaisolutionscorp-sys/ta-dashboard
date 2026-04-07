@@ -4,12 +4,14 @@ import { useState } from "react";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { useRatesForRoute } from "@/hooks/queries/rates/use-rates";
 import { useRoutesForAgency } from "@/hooks/queries/routes/use-routes";
+import { useAgencyAgents } from "@/hooks/queries/markup/use-agency-agents";
 import type { PassengerRate, CargoRate } from "@/constants/types/rate.types";
 import {
   RouteSelector,
   StatsCards,
   MarkupSection,
   RatesSection,
+  AgentSelector,
 } from "./_components";
 
 export default function RatesPage() {
@@ -17,9 +19,18 @@ export default function RatesPage() {
   const [selectedRouteCode, setSelectedRouteCode] = useState<string | null>(
     null,
   );
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
   const currentUser = useAuthStore((s) => s.user);
   const agencyId = currentUser?.travel_agency_id;
+  const isAdmin = currentUser?.role === "Admin";
+
+  const { data: agents, isLoading: agentsLoading } =
+    useAgencyAgents(isAdmin);
+
+  const activeAgentId = isAdmin
+    ? (selectedAgentId ?? currentUser?.id)
+    : currentUser?.id;
 
   const { data: routes, isLoading: routesLoading } =
     useRoutesForAgency(agencyId);
@@ -79,9 +90,21 @@ export default function RatesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Rates</h1>
           <p className="text-muted-foreground">
-            View ferry rates and pricing for your available routes
+            {isAdmin
+              ? "Manage markup rates for your agency's agents"
+              : "View ferry rates and pricing for your available routes"}
           </p>
         </div>
+
+        {/* Agent Selector — Admin only */}
+        {isAdmin && (
+          <AgentSelector
+            agents={agents}
+            isLoading={agentsLoading}
+            selectedAgentId={activeAgentId ?? null}
+            onSelectAgent={setSelectedAgentId}
+          />
+        )}
 
         {/* Route Selector + Search */}
         <RouteSelector
@@ -109,9 +132,10 @@ export default function RatesPage() {
         {/* Markup — shown first, before rates */}
         {activeRouteCode && (
           <MarkupSection
-            agentId={currentUser?.id}
+            agentId={activeAgentId}
             selectedRoute={selectedRoute}
             routeLabel={routeLabel}
+            isAdmin={isAdmin}
           />
         )}
 

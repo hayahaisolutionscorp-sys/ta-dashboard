@@ -28,12 +28,14 @@ interface MarkupSectionProps {
   agentId: string | undefined;
   selectedRoute: RouteEntity | undefined;
   routeLabel: string;
+  isAdmin: boolean;
 }
 
 export function MarkupSection({
   agentId,
   selectedRoute,
   routeLabel,
+  isAdmin,
 }: MarkupSectionProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
@@ -63,10 +65,12 @@ export function MarkupSection({
               Agent Markup — {routeLabel}
             </CardTitle>
             <p className="text-muted-foreground mt-1 text-sm">
-              Your commission markup applied on top of the base rates
+              {isAdmin
+                ? "Manage commission markup applied on top of the base rates"
+                : "Your assigned markup for this route (read-only)"}
             </p>
           </div>
-          {hasMarkup && (
+          {isAdmin && hasMarkup && (
             <Button
               variant="outline"
               size="sm"
@@ -87,12 +91,16 @@ export function MarkupSection({
               <IconPercentage className="text-muted-foreground mb-3 h-10 w-10 opacity-40" />
               <p className="font-medium">No markup configured</p>
               <p className="text-muted-foreground mb-4 text-sm">
-                Set up your commission markup for this route
+                {isAdmin
+                  ? "Set up a commission markup for this route"
+                  : "No markup has been assigned for this route yet"}
               </p>
-              <Button onClick={() => setCreateOpen(true)} type="button">
-                <IconPlus className="mr-1.5 h-4 w-4" />
-                Create Markup
-              </Button>
+              {isAdmin && (
+                <Button onClick={() => setCreateOpen(true)} type="button">
+                  <IconPlus className="mr-1.5 h-4 w-4" />
+                  Create Markup
+                </Button>
+              )}
             </div>
           ) : hasMarkup ? (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -166,8 +174,8 @@ export function MarkupSection({
         </CardContent>
       </Card>
 
-      {/* Create Modal */}
-      {agentId && selectedRoute && (
+      {/* Create Modal — Admin only */}
+      {isAdmin && agentId && selectedRoute && (
         <CreateMarkupModal
           open={createOpen}
           onOpenChange={setCreateOpen}
@@ -179,8 +187,8 @@ export function MarkupSection({
         />
       )}
 
-      {/* Update Modal */}
-      {markup && (
+      {/* Update Modal — Admin only */}
+      {isAdmin && markup && (
         <UpdateMarkupModal
           open={updateOpen}
           onOpenChange={setUpdateOpen}

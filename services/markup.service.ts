@@ -20,6 +20,7 @@ import type {
   MarkupEntity,
   CreateMarkupPayload,
   UpdateMarkupPayload,
+  AgencyAgent,
 } from "@/lib/types/markup.types";
 
 class MarkupService {
@@ -62,6 +63,14 @@ class MarkupService {
   ): Promise<MarkupEntity> {
     const res = await api.get<MarkupEntity>(
       TRAVEL_AGENCY_API.MARKUP.BY_AGENT_AND_ROUTE(agentId, routeId),
+    );
+    return res.data;
+  }
+
+  /** Fetch all agents in the caller's agency (Admin only). */
+  async getAgencyAgents(): Promise<AgencyAgent[]> {
+    const res = await api.get<AgencyAgent[]>(
+      TRAVEL_AGENCY_API.MARKUP.AGENCY_AGENTS,
     );
     return res.data;
   }

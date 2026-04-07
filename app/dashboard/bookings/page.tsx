@@ -13,7 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useBookings } from "@/hooks/queries/bookings/use-bookings";
+import { useAgencyAgents } from "@/hooks/queries/markup/use-agency-agents";
 import { useAuthStore } from "@/lib/stores/auth.store";
 
 function statusVariant(status: string) {
@@ -28,12 +36,19 @@ export default function BookingsPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(
+    undefined,
+  );
   const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = currentUser?.role === "Admin";
+
+  const { data: agents, isLoading: agentsLoading } = useAgencyAgents(isAdmin);
 
   const { data, isLoading, error, refetch } = useBookings({
     page,
     page_size: 20,
-    userId: currentUser?.id,
+    // Staff always sees own bookings. Admin sees all unless filtered.
+    userId: isAdmin ? selectedAgentId : currentUser?.id,
     agencyId: currentUser?.travel_agency_id,
   });
 
@@ -44,9 +59,19 @@ export default function BookingsPage() {
     ? bookings.filter(
         (b) =>
           (b.reference_no ?? "").toLowerCase().includes(search.toLowerCase()) ||
-          (b.route_summary ?? "").toLowerCase().includes(search.toLowerCase()),
+          (b.route_summary ?? "").toLowerCase().includes(search.toLowerCase()) ||
+          (b.booked_by_agent_name ?? "")
+            .toLowerCase()
+            .includes(search.toLowerCase()),
       )
     : bookings;
+
+  const handleAgentChange = (value: string) => {
+    setSelectedAgentId(value === "all" ? undefined : value);
+    setPage(1);
+  };
+
+  const gridCols = isAdmin ? "grid-cols-7" : "grid-cols-6";
 
   return (
     <div className="flex flex-1 flex-col">
@@ -56,7 +81,9 @@ export default function BookingsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Bookings</h1>
             <p className="text-muted-foreground">
-              Manage and view all your ferry bookings
+              {isAdmin
+                ? "View and manage all agency bookings"
+                : "Manage and view all your ferry bookings"}
             </p>
           </div>
           <div className="flex gap-2">
@@ -71,15 +98,43 @@ export default function BookingsPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-sm">
-          <IconSearch className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-          <Input
-            placeholder="Search by reference or route..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        {/* Filters */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative max-w-sm">
+            <IconSearch className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+            <Input
+              placeholder="Search by reference or route..."
+              className="pl-9"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Agent filter (Admin only) */}
+          {isAdmin && (
+            <Select
+              value={selectedAgentId ?? "all"}
+              onValueChange={handleAgentChange}
+            >
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="All Agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Agents</SelectItem>
+                {agentsLoading ? (
+                  <SelectItem value="loading" disabled>
+                    Loading...
+                  </SelectItem>
+                ) : (
+                  agents?.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      {agent.travel_agent_name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* Error state */}
@@ -95,7 +150,7 @@ export default function BookingsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>
-              Recent Bookings{" "}
+              {isAdmin ? "Agency Bookings" : "Recent Bookings"}{" "}
               {total > 0 && (
                 <span className="text-sm font-normal text-muted-foreground">
                   ({total} total)
@@ -109,12 +164,13 @@ export default function BookingsPage() {
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div
                     key={`skel-${i}`}
-                    className="grid grid-cols-6 gap-4 py-3"
+                    className={`grid ${gridCols} gap-4 py-3`}
                   >
                     <Skeleton className="h-4 w-24" />
                     <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-4 w-20" />
                     <Skeleton className="h-4 w-20" />
+                    {isAdmin && <Skeleton className="h-4 w-24" />}
                     <Skeleton className="h-6 w-20 rounded-full" />
                     <Skeleton className="h-8 w-16" />
                   </div>
@@ -141,11 +197,14 @@ export default function BookingsPage() {
             ) : (
               <div className="space-y-0">
                 {/* Table Header */}
-                <div className="grid grid-cols-6 gap-4 border-b pb-2 text-sm font-medium text-muted-foreground">
+                <div
+                  className={`grid ${gridCols} gap-4 border-b pb-2 text-sm font-medium text-muted-foreground`}
+                >
                   <span>Reference</span>
                   <span>Type</span>
                   <span>Source</span>
                   <span>Date</span>
+                  {isAdmin && <span>Booked By</span>}
                   <span>Status</span>
                   <span>Actions</span>
                 </div>
@@ -154,7 +213,7 @@ export default function BookingsPage() {
                 {filtered.map((booking) => (
                   <div
                     key={booking.id}
-                    className="grid grid-cols-6 gap-4 py-3 border-b last:border-0 items-center text-sm"
+                    className={`grid ${gridCols} gap-4 py-3 border-b last:border-0 items-center text-sm`}
                   >
                     <span className="font-mono text-xs">
                       {booking.reference_no ?? booking.id.slice(0, 8)}
@@ -173,6 +232,11 @@ export default function BookingsPage() {
                         },
                       )}
                     </span>
+                    {isAdmin && (
+                      <span className="truncate" title={booking.booked_by_agent_name ?? "Unknown"}>
+                        {booking.booked_by_agent_name ?? "Unknown"}
+                      </span>
+                    )}
                     <Badge variant={statusVariant(booking.status)}>
                       {booking.status}
                     </Badge>
