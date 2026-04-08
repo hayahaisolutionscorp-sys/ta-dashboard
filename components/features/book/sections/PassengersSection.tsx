@@ -24,6 +24,7 @@ interface TripAssignment {
   tripId: string;
   cabinId: number | null;
   discountType: string;
+  cabin_type_name?: string;
 }
 
 interface Passenger {
@@ -209,9 +210,13 @@ export default function PassengersSection({
                     disabled={isPricingLoading}
                     onValueChange={(val) => {
                       const updated = [...passenger.tripAssignments];
+                      const selectedCabin = trips[tripIdx]?.cabins?.find(
+                        (c) => c.id === Number(val),
+                      );
                       updated[tripIdx] = {
                         ...updated[tripIdx],
                         cabinId: Number(val),
+                        cabin_type_name: selectedCabin?.name,
                       };
                       onUpdate(index, "tripAssignments", updated);
                     }}

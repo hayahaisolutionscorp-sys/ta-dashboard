@@ -433,8 +433,9 @@ export default function CreateBookingPage() {
     };
 
     createBooking(formData, {
-      onSuccess: () => {
-        router.push(`/dashboard/bookings`);
+      onSuccess: (booking) => {
+        const bookingId = typeof booking === "string" ? booking : (booking as any)?.bookingId ?? (booking as any)?.id;
+        router.push(`/dashboard/bookings/${bookingId}`);
       },
     });
   };

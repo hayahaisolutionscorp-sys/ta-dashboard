@@ -103,6 +103,13 @@ export default function BookTripPage() {
       }));
   }, [routes, originCode]);
 
+  // Auto-select the first destination when origin changes and options load
+  useEffect(() => {
+    if (originCode && destinationOptions.length > 0 && !destinationCode) {
+      setDestinationCode(destinationOptions[0].portCode);
+    }
+  }, [destinationOptions]);
+
   // Fetch available dates for departure (origin → destination)
   const { data: availableDates, isLoading: datesLoading } = useAvailableDates(
     originCode.toUpperCase(),

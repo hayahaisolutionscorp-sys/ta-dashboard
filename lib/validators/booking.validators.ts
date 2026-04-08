@@ -22,6 +22,7 @@ import { z } from "zod";
 export const TripAssignmentSchema = z.object({
   tripId: z.string().min(1, "Invalid trip ID"),
   cabinId: z.number().positive("Please select a cabin").nullable(),
+  cabin_type_name: z.string().optional(),
   discountType: z.string().min(1, "Please select a passenger type"),
 });
 
