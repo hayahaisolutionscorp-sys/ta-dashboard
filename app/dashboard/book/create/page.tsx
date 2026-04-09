@@ -38,6 +38,7 @@ import { useBookingData } from "@/hooks/queries/bookings/use-booking-data";
 import { useCreateBooking } from "@/hooks/mutations/bookings/use-create-booking";
 import { useRoutesForAgency } from "@/hooks/queries/routes/use-routes";
 import { useMarkupByAgentAndRoute } from "@/hooks/queries/markup/use-markups";
+import { useCommissionLookup } from "@/hooks/queries/bookings/use-commission-lookup";
 import { usePricingCalculation } from "@/hooks/mutations/bookings/use-pricing-calculation";
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { useBookingFormUiStore } from "@/lib/stores/booking-form-ui.store";
@@ -131,6 +132,10 @@ export default function CreateBookingPage() {
     matchedRoute?.id,
   );
   const defaultMarkup = agentMarkup?.flat_passenger_markup ?? 0;
+
+  const { data: commissionAmount = 0 } = useCommissionLookup(
+    matchedRoute?.tenant_routes_id,
+  );
 
   // Use options directly from the prepared booking data (client API provides these)
   const derivedOptions = useMemo(() => {
@@ -627,7 +632,10 @@ export default function CreateBookingPage() {
 
                       {/* Payment Method */}
                       <div className="bg-gray-50/50 rounded-lg p-3 border border-gray-100">
-                        <PaymentMethodSection payableAmount={payableAmount} />
+                        <PaymentMethodSection
+                          payableAmount={payableAmount}
+                          commissionAmount={commissionAmount}
+                        />
                       </div>
 
                       {/* Submit */}
@@ -657,6 +665,8 @@ export default function CreateBookingPage() {
                 onBack={() => setStep(1)}
                 onConfirm={handleConfirmBooking}
                 isPending={isPending}
+                payableAmount={payableAmount}
+                commissionAmount={commissionAmount}
               />
             )}
           </div>
@@ -668,6 +678,7 @@ export default function CreateBookingPage() {
               allTrips={allTrips}
               formData={watchedFormData}
               onSnapshotId={(id) => form.setValue("rateSnapshotId", id)}
+              commissionAmount={commissionAmount}
             />
           </div>
         </div>
