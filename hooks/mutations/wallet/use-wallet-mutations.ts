@@ -47,19 +47,6 @@ export function useRequestWithdrawal() {
   });
 }
 
-export function useRequestManualDeposit() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (payload: ManualDepositPayload) =>
-      walletService.requestManualDeposit(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["wallet", "agency"],
-      });
-    },
-  });
-}
 
 export function useCreatePaymongoCheckout() {
   return useMutation({
@@ -82,11 +69,6 @@ export function useCreateMayaCheckout() {
   });
 }
 
-export function useUploadDepositProof() {
-  return useMutation({
-    mutationFn: (file: File) => walletService.uploadProofOfPayment(file),
-  });
-}
 
 export function useRequestManualDeposit() {
   const queryClient = useQueryClient();
