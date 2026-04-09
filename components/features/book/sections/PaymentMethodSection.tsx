@@ -13,10 +13,13 @@ interface PaymentMethodSectionProps {
    * which excludes ta_markup (the TA's own markup is their revenue, not a cost).
    */
   payableAmount?: number;
+  /** Commission discount applied by the tenant for this route/agency. */
+  commissionAmount?: number;
 }
 
 export default function PaymentMethodSection({
   payableAmount = 0,
+  commissionAmount = 0,
 }: PaymentMethodSectionProps) {
   const { setValue, watch } = useFormContext<BookingFormData>();
   const currentUser = useAuthStore((s) => s.user);
@@ -26,7 +29,10 @@ export default function PaymentMethodSection({
 
   const selectedMethod = watch("paymentMethod");
   const balance = walletData?.balance?.balance ?? 0;
-  const hasInsufficientBalance = payableAmount > 0 && balance < payableAmount;
+  const netPayable = payableAmount > 0 && commissionAmount > 0
+    ? Math.max(0, payableAmount - commissionAmount)
+    : payableAmount;
+  const hasInsufficientBalance = netPayable > 0 && balance < netPayable;
 
   const formatCurrency = (amount: number) =>
     `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -125,14 +131,29 @@ export default function PaymentMethodSection({
         </div>
       </div>
 
-      {payableAmount > 0 && (
-        <p className="text-[11px] text-muted-foreground">
-          Amount to be charged:{" "}
-          <span className="font-medium text-gray-700">
-            {formatCurrency(payableAmount)}
-          </span>{" "}
-          (excludes agent markup)
-        </p>
+      {netPayable > 0 && (
+        <div className="space-y-0.5">
+          {commissionAmount > 0 && (
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <span className="text-muted-foreground">Base fare:</span>
+              <span className="font-medium text-gray-500 line-through">
+                {formatCurrency(payableAmount)}
+              </span>
+              <span className="text-green-600 font-medium">
+                − {formatCurrency(commissionAmount)} commission
+              </span>
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            Wallet deduction:{" "}
+            <span className="font-semibold text-green-700">
+              {formatCurrency(netPayable)}
+            </span>
+            {commissionAmount > 0 && (
+              <span className="ml-1 text-green-600">(commission applied)</span>
+            )}
+          </p>
+        </div>
       )}
     </div>
   );

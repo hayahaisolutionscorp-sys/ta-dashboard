@@ -46,6 +46,7 @@ interface TripSummaryPanelProps {
   allTrips: BookingFormTrip[];
   formData?: BookingFormData;
   onSnapshotId?: (snapshotId: number) => void;
+  commissionAmount?: number;
 }
 
 interface PassengerLine {
@@ -83,6 +84,7 @@ export default function TripSummaryPanel({
   allTrips,
   formData,
   onSnapshotId,
+  commissionAmount = 0,
 }: TripSummaryPanelProps) {
   const setPricingLoading = useBookingFormUiStore((s) => s.setPricingLoading);
 
@@ -343,6 +345,7 @@ export default function TripSummaryPanel({
   const markupAmount = formData?.ta_markup ?? 0;
   const baseTotal = pricing?.grandTotal ?? (grandTotalFromGroups + otherChargesTotal);
   const grandTotal = baseTotal + markupAmount;
+  const netWalletDeduction = commissionAmount > 0 ? Math.max(0, baseTotal - commissionAmount) : baseTotal;
 
   return (
     <div className="sticky top-20 space-y-3">
@@ -584,14 +587,32 @@ export default function TripSummaryPanel({
               </div>
             )}
 
+            {/* Commission Discount */}
+            {commissionAmount > 0 && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-green-600">Commission Discount</span>
+                <span className="font-medium text-green-600">
+                  −{formatCurrency(commissionAmount)}
+                </span>
+              </div>
+            )}
+
             {/* Grand Total */}
             <Separator />
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold">Estimated Total</span>
-              <span className="text-sm font-bold text-green-700">
+              <span className="text-sm font-bold text-gray-800">
                 {isPricingLoading ? "..." : formatCurrency(grandTotal)}
               </span>
             </div>
+            {commissionAmount > 0 && !isPricingLoading && baseTotal > 0 && (
+              <div className="flex justify-between items-center bg-green-50 rounded-md px-2 py-1.5 -mx-1">
+                <span className="text-xs font-semibold text-green-700">You Pay (Wallet)</span>
+                <span className="text-sm font-bold text-green-700">
+                  {formatCurrency(netWalletDeduction)}
+                </span>
+              </div>
+            )}
             {grandTotal === 0 && hasItems && !isPricingLoading && (
               <p className="text-[10px] text-gray-400">
                 Rates not available — prices will be calculated on submission

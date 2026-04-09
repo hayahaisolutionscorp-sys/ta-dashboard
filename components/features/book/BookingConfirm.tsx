@@ -15,6 +15,7 @@ import {
   IconReceipt,
   IconWallet,
   IconCreditCard,
+  IconTag,
 } from "@tabler/icons-react";
 
 interface BookingConfirmProps {
@@ -23,6 +24,8 @@ interface BookingConfirmProps {
   onBack: () => void;
   onConfirm: () => void;
   isPending: boolean;
+  payableAmount?: number;
+  commissionAmount?: number;
 }
 
 export default function BookingConfirm({
@@ -31,7 +34,17 @@ export default function BookingConfirm({
   onBack,
   onConfirm,
   isPending,
+  payableAmount = 0,
+  commissionAmount = 0,
 }: BookingConfirmProps) {
+  const formatCurrency = (amount: number) =>
+    `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const netWalletDeduction =
+    payableAmount > 0 && commissionAmount > 0
+      ? Math.max(0, payableAmount - commissionAmount)
+      : payableAmount;
+
   const formatDate = (date: Date | string): string => {
     const d = date instanceof Date ? date : new Date(date);
     if (Number.isNaN(d.getTime())) return "—";
@@ -249,22 +262,52 @@ export default function BookingConfirm({
       {/* Payment Method */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-3">
             {formData.paymentMethod === "TA-WALLET" ? (
               <IconWallet className="h-4 w-4 text-blue-600" />
             ) : (
               <IconCreditCard className="h-4 w-4 text-indigo-600" />
             )}
-            <h3 className="text-sm font-semibold">Payment Method</h3>
+            <h3 className="text-sm font-semibold">Payment Summary</h3>
           </div>
-          <div className="text-sm font-medium">
-            {formData.paymentMethod === "TA-WALLET"
-              ? "Wallet Credit"
-              : "Online Payment (PayMongo)"}
+
+          <div className="space-y-1.5 text-sm">
+            <div className="text-sm font-medium mb-2">
+              {formData.paymentMethod === "TA-WALLET"
+                ? "Wallet Credit"
+                : "Online Payment (PayMongo)"}
+            </div>
+
+            {payableAmount > 0 && (
+              <div className="space-y-1 border-t pt-2">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Base fare</span>
+                  <span>{formatCurrency(payableAmount)}</span>
+                </div>
+                {commissionAmount > 0 && (
+                  <div className="flex justify-between text-xs text-green-600">
+                    <div className="flex items-center gap-1">
+                      <IconTag className="h-3 w-3" />
+                      <span>Commission discount</span>
+                    </div>
+                    <span>−{formatCurrency(commissionAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-semibold border-t pt-1.5 mt-1">
+                  <span className={commissionAmount > 0 ? "text-green-700" : ""}>
+                    {formData.paymentMethod === "TA-WALLET" ? "Wallet deduction" : "You pay"}
+                  </span>
+                  <span className={commissionAmount > 0 ? "text-green-700" : ""}>
+                    {formatCurrency(netWalletDeduction)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground pt-1">
+              Agent markup is collected from the passenger and is not deducted from your wallet.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Agent markup is collected from the passenger and is not deducted from your wallet.
-          </p>
         </CardContent>
       </Card>
 
