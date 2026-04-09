@@ -1,3 +1,21 @@
+// ==================== Commission Types ====================
+
+export type CommissionType = "fixed" | "percentage";
+
+export interface CommissionConfig {
+  passengerCommissionType: CommissionType;
+  passengerCommissionValue: number;
+  cargoCommissionType: CommissionType;
+  cargoCommissionValue: number;
+}
+
+export const ZERO_COMMISSION_CONFIG: CommissionConfig = {
+  passengerCommissionType: "fixed",
+  passengerCommissionValue: 0,
+  cargoCommissionType: "fixed",
+  cargoCommissionValue: 0,
+};
+
 // ==================== API Response Types ====================
 
 export interface SuccessResponse<T> {

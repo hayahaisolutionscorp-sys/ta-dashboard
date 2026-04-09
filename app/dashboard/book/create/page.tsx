@@ -29,7 +29,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { FormProvider, useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,9 @@ import type {
   BookingFormTrip,
   CalculatePricingRequest,
 } from "@/constants/types/booking.types";
+import { ZERO_COMMISSION_CONFIG } from "@/constants/types/booking.types";
+import { calculateCommissionAmounts } from "@/lib/utils/commission";
+import CommissionBreakdownModal from "@/components/features/book/CommissionBreakdownModal";
 import PassengersSection from "@/components/features/book/sections/PassengersSection";
 import VehiclesSection from "@/components/features/book/sections/VehiclesSection";
 import LooseCargosSection from "@/components/features/book/sections/LooseCargosSection";
@@ -133,9 +136,11 @@ export default function CreateBookingPage() {
   );
   const defaultMarkup = agentMarkup?.flat_passenger_markup ?? 0;
 
-  const { data: commissionAmount = 0 } = useCommissionLookup(
+  const { data: commissionConfig = ZERO_COMMISSION_CONFIG } = useCommissionLookup(
     matchedRoute?.tenant_routes_id,
   );
+
+  const [showCommissionModal, setShowCommissionModal] = useState(false);
 
   // Use options directly from the prepared booking data (client API provides these)
   const derivedOptions = useMemo(() => {
@@ -330,6 +335,15 @@ export default function CreateBookingPage() {
   const { data: payablePricing } = usePricingCalculation({ request: payablePricingRequest });
   const payableAmount = payablePricing?.grandTotal ?? 0;
 
+  // Compute flat commission total from config + pricing — used by existing display components
+  const passengerTotal = payablePricing?.baseFare?.passengers ?? 0;
+  const cargoTotal = payablePricing?.baseFare?.cargo ?? 0;
+  const { totalCommissionAmount: commissionAmount } = calculateCommissionAmounts(
+    commissionConfig,
+    passengerTotal,
+    cargoTotal,
+  );
+
   // Add/remove handlers
   const handleAddPassenger = () => {
     const current = form.getValues("passengers");
@@ -419,8 +433,17 @@ export default function CreateBookingPage() {
     );
   };
 
-  const onSubmit: SubmitHandler<BookingFormData> = () => {
-    setStep(2);
+  const onSubmit: SubmitHandler<BookingFormData> = (data) => {
+    const paymentMethod = data.paymentMethod;
+    const hasCommission =
+      commissionConfig.passengerCommissionValue > 0 ||
+      commissionConfig.cargoCommissionValue > 0;
+
+    if (paymentMethod === "TA-WALLET" && hasCommission) {
+      setShowCommissionModal(true);
+    } else {
+      setStep(2);
+    }
   };
 
   const handleConfirmBooking = () => {
@@ -493,6 +516,18 @@ export default function CreateBookingPage() {
 
   return (
     <div className="flex flex-1 flex-col">
+      <CommissionBreakdownModal
+        open={showCommissionModal}
+        commissionConfig={commissionConfig}
+        passengerTotal={passengerTotal}
+        cargoTotal={cargoTotal}
+        grandTotal={payableAmount}
+        onBack={() => setShowCommissionModal(false)}
+        onConfirm={() => {
+          setShowCommissionModal(false);
+          setStep(2);
+        }}
+      />
       <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6 max-w-350 mx-auto w-full">
         {/* Header */}
         <div className="flex items-center gap-4">
