@@ -129,7 +129,7 @@ class BookingService {
    * and forwards the TA user's globalUserId + agencyId for local ID resolution.
    * Uses a 60-second timeout to accommodate slow downstream processing.
    */
-  async createBooking(bookingData: BookingFormData): Promise<BookingView> {
+  async createBooking(bookingData: BookingFormData): Promise<string> {
     // Map form data for the API (same as TMS pattern)
     const payload: Record<string, unknown> = { ...bookingData };
 
@@ -211,7 +211,7 @@ class BookingService {
       payload.agencyId = user.travel_agency_id;
     }
 
-    const response = await api.post<BookingView>(
+    const response = await api.post<string>(
       TRAVEL_AGENCY_API.BOOKINGS.CREATE,
       payload,
       { timeout: 60_000 },

@@ -138,6 +138,15 @@ function TransactionRow({ activity }: { activity: WalletActivity }) {
           {formatCurrency(activity.amount)}
         </p>
       </TableCell>
+      <TableCell className="px-3 py-3 text-right">
+        {activity.commission_amount != null && activity.commission_amount > 0 ? (
+          <p className="text-sm font-medium text-green-600">
+            −{formatCurrency(activity.commission_amount)}
+          </p>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </TableCell>
       <TableCell className="px-3 py-3 text-right text-xs text-muted-foreground whitespace-nowrap">
         {formatDate(activity.created_at)}
       </TableCell>
@@ -1393,8 +1402,8 @@ export default function WalletPage() {
   }, [splitStatus?.status, splitStatus?.paid_amount, refetch]);
 
   const balance = data?.balance;
-  const activities = data?.activities.results ?? [];
-  const manualDeposits = data?.manualDeposits.results ?? [];
+  const activities = data?.activities?.results ?? [];
+  const manualDeposits = data?.manualDeposits?.results ?? [];
   const currentBalance = Number(balance?.balance ?? 0);
   const activityMeta = data?.activities;
   const depositMeta = data?.manualDeposits;
@@ -1632,6 +1641,7 @@ export default function WalletPage() {
                         <TableHead className="px-3">Transaction</TableHead>
                         <TableHead className="px-3">Reference</TableHead>
                         <TableHead className="px-3 text-right">Amount</TableHead>
+                        <TableHead className="px-3 text-right">Commission</TableHead>
                         <TableHead className="px-3 text-right">Requested At</TableHead>
                       </TableRow>
                     </TableHeader>

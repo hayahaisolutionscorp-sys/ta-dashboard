@@ -552,17 +552,31 @@ export default function BookingDetailPage() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center p-4">
                 <p className="text-sm text-muted-foreground">Ticket Price</p>
-                <p className="text-lg font-bold text-green-600">
-                  {formatCurrency(
-                    Number(booking.total_price ?? 0) -
-                      Number(booking.ta_markup ?? 0),
-                  )}
-                </p>
-                {booking.ta_markup && Number(booking.ta_markup) > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    + {formatCurrency(booking.ta_markup)} markup
-                  </p>
-                )}
+                {(() => {
+                  const commission =
+                    Number(booking.ta_passenger_commission ?? 0) +
+                    Number(booking.ta_cargo_commission ?? 0);
+                  const markup = Number(booking.ta_markup ?? 0);
+                  const base = Number(booking.price_without_markup ?? booking.total_price ?? 0);
+                  const netPrice = base - commission;
+                  return (
+                    <>
+                      <p className="text-lg font-bold text-green-600">
+                        {formatCurrency(netPrice)}
+                      </p>
+                      {commission > 0 && (
+                        <p className="text-xs text-blue-600">
+                          − {formatCurrency(commission)} commission
+                        </p>
+                      )}
+                      {markup > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          received {formatCurrency(markup)} markup
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>

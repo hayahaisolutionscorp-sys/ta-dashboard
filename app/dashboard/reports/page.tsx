@@ -63,7 +63,7 @@ export default function ReportsPage() {
   const [format, setFormat] = useState<ExportFormat>("excel");
   const [previewRequested, setPreviewRequested] = useState(false);
 
-  const canPreview = dateFrom && dateTo && dateFrom <= dateTo;
+  const canPreview = Boolean(dateFrom && dateTo && dateFrom <= dateTo);
 
   const agencyData = useAgencyReportData(
     { date_from: dateFrom, date_to: dateTo },
@@ -122,8 +122,6 @@ export default function ReportsPage() {
 
   const handleReset = () => {
     setPreviewRequested(false);
-    agencyData.remove?.();
-    staffData.remove?.();
   };
 
   const handleReportTypeChange = (value: string) => {

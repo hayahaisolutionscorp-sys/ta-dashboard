@@ -20,8 +20,12 @@ interface CommissionBreakdownModalProps {
   passengerTotal: number;
   /** Sum of all cargo base fares for the booking */
   cargoTotal: number;
-  /** Grand total (base + charges, excludes ta_markup) — what the TA owes before commission */
+  /** Grand total (base + charges + taxes, excludes ta_markup) — what the TA owes before commission */
   grandTotal: number;
+  /** Total surcharges from pricing */
+  chargesTotal?: number;
+  /** Total taxes from pricing */
+  taxesTotal?: number;
   onBack: () => void;
   onConfirm: () => void;
 }
@@ -43,6 +47,8 @@ export default function CommissionBreakdownModal({
   passengerTotal,
   cargoTotal,
   grandTotal,
+  chargesTotal = 0,
+  taxesTotal = 0,
   onBack,
   onConfirm,
 }: CommissionBreakdownModalProps) {
@@ -130,6 +136,24 @@ export default function CommissionBreakdownModal({
             </div>
           )}
 
+          {/* Surcharges & Taxes */}
+          {(chargesTotal > 0 || taxesTotal > 0) && (
+            <div className="space-y-1 ml-5">
+              {chargesTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Surcharges</span>
+                  <span>{formatCurrency(chargesTotal)}</span>
+                </div>
+              )}
+              {taxesTotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Taxes</span>
+                  <span>{formatCurrency(taxesTotal)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <Separator />
 
           {/* Net deduction */}
@@ -158,7 +182,7 @@ export default function CommissionBreakdownModal({
             Back to Edit
           </Button>
           <Button type="button" onClick={onConfirm}>
-            Confirm & Review
+            Confirm & Create Booking
           </Button>
         </DialogFooter>
       </DialogContent>

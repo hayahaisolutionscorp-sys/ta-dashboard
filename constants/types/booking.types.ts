@@ -165,6 +165,14 @@ export interface CargoClassOption {
   display: string;
 }
 
+// ==================== Booking Create Response ====================
+
+/**
+ * After the axios response interceptor unwraps { data, message, ... },
+ * createBooking resolves to just the booking UUID string.
+ */
+export type CreateBookingResponse = string;
+
 // ==================== Booking View Types ====================
 
 export interface BookingView {
@@ -197,6 +205,8 @@ export interface BookingView {
   price_without_markup?: string;
   ta_markup?: string;
   bir_invoice_no?: string;
+  ta_passenger_commission?: string | null;
+  ta_cargo_commission?: string | null;
   payment_status?: string;
   payment_status_raw?: string;
   payment_date?: string;

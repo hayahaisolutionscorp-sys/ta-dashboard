@@ -20,6 +20,7 @@ export interface WalletActivity {
   amount: number;
   reference_code: string;
   transaction_type: "deposit" | "usage";
+  commission_amount: number | null;
   created_at: string;
   performed_by: string | null;
 }

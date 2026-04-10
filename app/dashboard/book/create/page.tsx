@@ -52,7 +52,6 @@ import type {
   CalculatePricingRequest,
 } from "@/constants/types/booking.types";
 import { ZERO_COMMISSION_CONFIG } from "@/constants/types/booking.types";
-import { calculateCommissionAmounts } from "@/lib/utils/commission";
 import CommissionBreakdownModal from "@/components/features/book/CommissionBreakdownModal";
 import PassengersSection from "@/components/features/book/sections/PassengersSection";
 import VehiclesSection from "@/components/features/book/sections/VehiclesSection";
@@ -335,14 +334,9 @@ export default function CreateBookingPage() {
   const { data: payablePricing } = usePricingCalculation({ request: payablePricingRequest });
   const payableAmount = payablePricing?.grandTotal ?? 0;
 
-  // Compute flat commission total from config + pricing — used by existing display components
+  // Passenger/cargo totals used by the commission breakdown modal
   const passengerTotal = payablePricing?.baseFare?.passengers ?? 0;
   const cargoTotal = payablePricing?.baseFare?.cargo ?? 0;
-  const { totalCommissionAmount: commissionAmount } = calculateCommissionAmounts(
-    commissionConfig,
-    passengerTotal,
-    cargoTotal,
-  );
 
   // Add/remove handlers
   const handleAddPassenger = () => {
@@ -433,23 +427,12 @@ export default function CreateBookingPage() {
     );
   };
 
-  const onSubmit: SubmitHandler<BookingFormData> = (data) => {
-    const paymentMethod = data.paymentMethod;
-    const hasCommission =
-      commissionConfig.passengerCommissionValue > 0 ||
-      commissionConfig.cargoCommissionValue > 0;
-
-    if (paymentMethod === "TA-WALLET" && hasCommission) {
-      setShowCommissionModal(true);
-    } else {
-      setStep(2);
-    }
+  const onSubmit: SubmitHandler<BookingFormData> = (_data) => {
+    setStep(2);
   };
 
-  const handleConfirmBooking = () => {
+  const submitBooking = () => {
     const rawFormData = form.getValues();
-
-    // Clean data for submission
     const formData = {
       ...rawFormData,
       passengers: rawFormData.passengers.map((p) => ({
@@ -459,13 +442,24 @@ export default function CreateBookingPage() {
         email: p.email || rawFormData.contactEmail,
       })),
     };
-
     createBooking(formData, {
-      onSuccess: (booking) => {
-        const bookingId = typeof booking === "string" ? booking : (booking as any)?.bookingId ?? (booking as any)?.id;
+      onSuccess: (bookingId: string) => {
         router.push(`/dashboard/bookings/${bookingId}`);
       },
     });
+  };
+
+  const hasCommission =
+    commissionConfig.passengerCommissionValue > 0 ||
+    commissionConfig.cargoCommissionValue > 0;
+
+  const handleConfirmBooking = () => {
+    const paymentMethod = form.getValues("paymentMethod");
+    if (paymentMethod === "TA-WALLET" && hasCommission) {
+      setShowCommissionModal(true);
+    } else {
+      submitBooking();
+    }
   };
 
   if (isLoading) {
@@ -522,10 +516,12 @@ export default function CreateBookingPage() {
         passengerTotal={passengerTotal}
         cargoTotal={cargoTotal}
         grandTotal={payableAmount}
+        chargesTotal={payablePricing?.chargesTotal ?? 0}
+        taxesTotal={payablePricing?.taxesTotal ?? 0}
         onBack={() => setShowCommissionModal(false)}
         onConfirm={() => {
           setShowCommissionModal(false);
-          setStep(2);
+          submitBooking();
         }}
       />
       <div className="flex flex-col gap-4 p-4 md:gap-6 md:p-6 max-w-350 mx-auto w-full">
@@ -669,7 +665,6 @@ export default function CreateBookingPage() {
                       <div className="bg-gray-50/50 rounded-lg p-3 border border-gray-100">
                         <PaymentMethodSection
                           payableAmount={payableAmount}
-                          commissionAmount={commissionAmount}
                         />
                       </div>
 
@@ -701,7 +696,9 @@ export default function CreateBookingPage() {
                 onConfirm={handleConfirmBooking}
                 isPending={isPending}
                 payableAmount={payableAmount}
-                commissionAmount={commissionAmount}
+                baseFare={payablePricing?.baseFare?.total ?? 0}
+                chargesTotal={payablePricing?.chargesTotal ?? 0}
+                taxesTotal={payablePricing?.taxesTotal ?? 0}
               />
             )}
           </div>
@@ -713,7 +710,6 @@ export default function CreateBookingPage() {
               allTrips={allTrips}
               formData={watchedFormData}
               onSnapshotId={(id) => form.setValue("rateSnapshotId", id)}
-              commissionAmount={commissionAmount}
             />
           </div>
         </div>

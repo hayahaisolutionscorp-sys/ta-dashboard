@@ -15,7 +15,6 @@ import {
   IconReceipt,
   IconWallet,
   IconCreditCard,
-  IconTag,
 } from "@tabler/icons-react";
 
 interface BookingConfirmProps {
@@ -25,7 +24,9 @@ interface BookingConfirmProps {
   onConfirm: () => void;
   isPending: boolean;
   payableAmount?: number;
-  commissionAmount?: number;
+  baseFare?: number;
+  chargesTotal?: number;
+  taxesTotal?: number;
 }
 
 export default function BookingConfirm({
@@ -35,15 +36,12 @@ export default function BookingConfirm({
   onConfirm,
   isPending,
   payableAmount = 0,
-  commissionAmount = 0,
+  baseFare = 0,
+  chargesTotal = 0,
+  taxesTotal = 0,
 }: BookingConfirmProps) {
   const formatCurrency = (amount: number) =>
     `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-  const netWalletDeduction =
-    payableAmount > 0 && commissionAmount > 0
-      ? Math.max(0, payableAmount - commissionAmount)
-      : payableAmount;
 
   const formatDate = (date: Date | string): string => {
     const d = date instanceof Date ? date : new Date(date);
@@ -280,33 +278,34 @@ export default function BookingConfirm({
 
             {payableAmount > 0 && (
               <div className="space-y-1 border-t pt-2">
-                <div className="flex justify-between text-xs text-muted-foreground">
+                <div className="flex justify-between text-muted-foreground">
                   <span>Base fare</span>
-                  <span>{formatCurrency(payableAmount)}</span>
+                  <span>{formatCurrency(baseFare)}</span>
                 </div>
-                {commissionAmount > 0 && (
-                  <div className="flex justify-between text-xs text-green-600">
-                    <div className="flex items-center gap-1">
-                      <IconTag className="h-3 w-3" />
-                      <span>Commission discount</span>
-                    </div>
-                    <span>−{formatCurrency(commissionAmount)}</span>
+                {chargesTotal > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Surcharges</span>
+                    <span>{formatCurrency(chargesTotal)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm font-semibold border-t pt-1.5 mt-1">
-                  <span className={commissionAmount > 0 ? "text-green-700" : ""}>
-                    {formData.paymentMethod === "TA-WALLET" ? "Wallet deduction" : "You pay"}
-                  </span>
-                  <span className={commissionAmount > 0 ? "text-green-700" : ""}>
-                    {formatCurrency(netWalletDeduction)}
-                  </span>
+                {taxesTotal > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Taxes</span>
+                    <span>{formatCurrency(taxesTotal)}</span>
+                  </div>
+                )}
+                {(formData.ta_markup ?? 0) > 0 && (
+                  <div className="flex justify-between text-muted-foreground line-through">
+                    <span>Markup (collected from passenger)</span>
+                    <span>{formatCurrency(formData.ta_markup ?? 0)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-semibold border-t pt-1 mt-1">
+                  <span>{formData.paymentMethod === "TA-WALLET" ? "Wallet deduction" : "You pay"}</span>
+                  <span>{formatCurrency(payableAmount)}</span>
                 </div>
               </div>
             )}
-
-            <p className="text-xs text-muted-foreground pt-1">
-              Agent markup is collected from the passenger and is not deducted from your wallet.
-            </p>
           </div>
         </CardContent>
       </Card>
