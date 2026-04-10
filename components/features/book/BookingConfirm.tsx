@@ -15,6 +15,7 @@ import {
   IconReceipt,
   IconWallet,
   IconCreditCard,
+  IconTag,
 } from "@tabler/icons-react";
 
 interface BookingConfirmProps {

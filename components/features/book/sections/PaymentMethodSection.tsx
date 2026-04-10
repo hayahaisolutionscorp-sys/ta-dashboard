@@ -13,10 +13,13 @@ interface PaymentMethodSectionProps {
    * which excludes ta_markup (the TA's own markup is their revenue, not a cost).
    */
   payableAmount?: number;
+  /** Commission discount applied by the tenant for this route/agency. */
+  commissionAmount?: number;
 }
 
 export default function PaymentMethodSection({
   payableAmount = 0,
+  commissionAmount = 0,
 }: PaymentMethodSectionProps) {
   const { setValue, watch } = useFormContext<BookingFormData>();
   const currentUser = useAuthStore((s) => s.user);
@@ -26,7 +29,10 @@ export default function PaymentMethodSection({
 
   const selectedMethod = watch("paymentMethod");
   const balance = walletData?.balance?.balance ?? 0;
-  const hasInsufficientBalance = payableAmount > 0 && balance < payableAmount;
+  const netPayable = payableAmount > 0 && commissionAmount > 0
+    ? Math.max(0, payableAmount - commissionAmount)
+    : payableAmount;
+  const hasInsufficientBalance = netPayable > 0 && balance < netPayable;
 
   const formatCurrency = (amount: number) =>
     `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
