@@ -43,7 +43,7 @@ import { usePricingCalculation } from "@/hooks/mutations/bookings/use-pricing-ca
 import { useAuthStore } from "@/lib/stores/auth.store";
 import { useBookingFormUiStore } from "@/lib/stores/booking-form-ui.store";
 import {
-  CreateBookingSchema,
+  makeCreateBookingSchema,
   type BookingFormData,
 } from "@/lib/validators/booking.validators";
 import type {
@@ -166,26 +166,27 @@ export default function CreateBookingPage() {
     // Accommodation codes from the API
     const validAccommodations = new Set(bookingData.accommodationCodes ?? []);
 
-    // Derive cabin types from ship data in trips
-    const shipCabinTypes = new Set<string>();
+    // Derive available cabin codes from ship data in trips
+    const shipCabinCodes = new Set<string>();
     const trips = [
       ...(bookingData.departure ?? []),
       ...(bookingData.return ?? []),
     ];
     for (const trip of trips) {
       for (const cabin of trip.ship?.cabins ?? []) {
-        if (cabin.name) {
-          shipCabinTypes.add(cabin.name.toUpperCase());
+        const key = cabin.code ?? cabin.name;
+        if (key) {
+          shipCabinCodes.add(key.toUpperCase());
         }
       }
     }
 
-    let availableCabinTypes = Array.from(shipCabinTypes)
-      .filter((ct) => validAccommodations.has(ct.toUpperCase()))
+    let availableCabinTypes = Array.from(shipCabinCodes)
+      .filter((code) => validAccommodations.has(code.toUpperCase()))
       .sort();
 
-    if (availableCabinTypes.length === 0 && shipCabinTypes.size > 0) {
-      availableCabinTypes = Array.from(shipCabinTypes).sort();
+    if (availableCabinTypes.length === 0 && shipCabinCodes.size > 0) {
+      availableCabinTypes = Array.from(shipCabinCodes).sort();
     } else if (availableCabinTypes.length === 0) {
       availableCabinTypes = ["Aircon", "Non-Aircon"];
     }
@@ -201,10 +202,21 @@ export default function CreateBookingPage() {
 
   const { discountTypes, vehicleClasses, cargoClasses } = derivedOptions;
 
+  // Bake the route's passenger markup cap into the schema so the form
+  // re-validates whenever the cap changes (route switch, or route loads in).
+  const bookingSchema = useMemo(
+    () =>
+      makeCreateBookingSchema({
+        maxPassengerMarkup:
+          matchedRoute?.max_flat_passenger_markup ?? Number.POSITIVE_INFINITY,
+      }),
+    [matchedRoute?.max_flat_passenger_markup],
+  );
+
   // Initialize form
   const form = useForm<BookingFormData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(CreateBookingSchema) as any,
+    resolver: zodResolver(bookingSchema) as any,
     mode: "onChange",
     defaultValues: {
       bookingType: "Single",
@@ -243,9 +255,11 @@ export default function CreateBookingPage() {
     }
   }, [allTrips, form]);
 
-  // Sync ta_markup form value when the agent's configured markup loads
+  // Sync ta_markup form value when the agent's configured markup loads.
+  // shouldValidate:true so the refined schema runs — if defaultMarkup exceeds
+  // a newly-loaded route's cap, the error surfaces immediately.
   useEffect(() => {
-    form.setValue("ta_markup", defaultMarkup, { shouldValidate: false });
+    form.setValue("ta_markup", defaultMarkup, { shouldValidate: true });
   }, [defaultMarkup, form]);
 
   const { watch, handleSubmit } = form;
@@ -322,7 +336,8 @@ export default function CreateBookingPage() {
         passengerType: pax.tripAssignments?.at(0)?.discountType ?? "Adult",
         tripAssignments: (pax.tripAssignments ?? []).map((ta) => ({
           tripId: ta.tripId,
-          cabinId: ta.cabinId,
+          // Omit cabinId when null — same guard as TripSummaryPanel
+          ...(ta.cabinId != null ? { cabinId: ta.cabinId } : {}),
           discountType: ta.discountType,
         })),
       })),
@@ -346,6 +361,16 @@ export default function CreateBookingPage() {
       discountTypes[0] ||
       "Adult";
 
+    const tripAssignments = allTrips.map((trip) => {
+      const firstCabin = trip.cabins?.at(0);
+      return {
+        tripId: trip.id,
+        cabinId: firstCabin?.id ?? null,
+        cabin_type_name: firstCabin?.cabin_type_name ?? firstCabin?.name,
+        discountType: defaultDiscount,
+      };
+    });
+
     const newPassenger = {
       firstName: "",
       lastName: "",
@@ -357,14 +382,7 @@ export default function CreateBookingPage() {
       occupation: "",
       civilStatus: "Single",
       mobileNumber: "",
-      tripAssignments: allTrips.map((trip) => {
-        return {
-          tripId: trip.id,
-          cabinId: trip.cabins?.at(0)?.id ?? null,
-          cabin_type_name: trip.cabins?.at(0)?.name,
-          discountType: defaultDiscount,
-        };
-      }),
+      tripAssignments,
     };
 
     form.setValue("passengers", [...current, newPassenger]);
@@ -435,6 +453,7 @@ export default function CreateBookingPage() {
     const rawFormData = form.getValues();
     const formData = {
       ...rawFormData,
+      routeCode: bookingRouteCode ?? undefined,
       passengers: rawFormData.passengers.map((p) => ({
         ...p,
         address: p.address || rawFormData.contactAddress,
@@ -449,13 +468,9 @@ export default function CreateBookingPage() {
     });
   };
 
-  const hasCommission =
-    commissionConfig.passengerCommissionValue > 0 ||
-    commissionConfig.cargoCommissionValue > 0;
-
   const handleConfirmBooking = () => {
     const paymentMethod = form.getValues("paymentMethod");
-    if (paymentMethod === "TA-WALLET" && hasCommission) {
+    if (paymentMethod === "TA-WALLET") {
       setShowCommissionModal(true);
     } else {
       submitBooking();
@@ -658,7 +673,20 @@ export default function CreateBookingPage() {
 
                       {/* Additional Details (Markup + Remarks) */}
                       <div className="bg-gray-50/50 rounded-lg p-3 border border-gray-100">
-                        <AdditionalInfoSection defaultMarkup={defaultMarkup} />
+                        <AdditionalInfoSection
+                          defaultMarkup={defaultMarkup}
+                          maxPassengerMarkup={
+                            matchedRoute?.max_flat_passenger_markup ??
+                            Number.POSITIVE_INFINITY
+                          }
+                          maxCargoMarkup={
+                            matchedRoute?.max_flat_cargo_markup ?? 0
+                          }
+                          hasCargo={
+                            (vehicles?.length ?? 0) > 0 ||
+                            (looseCargos?.length ?? 0) > 0
+                          }
+                        />
                       </div>
 
                       {/* Payment Method */}
@@ -679,7 +707,12 @@ export default function CreateBookingPage() {
                         </Button>
                         <Button
                           type="submit"
-                          disabled={!form.formState.isValid}
+                          disabled={
+                            !form.formState.isValid ||
+                            (taMarkup ?? 0) >
+                              (matchedRoute?.max_flat_passenger_markup ??
+                                Number.POSITIVE_INFINITY)
+                          }
                         >
                           Review Booking
                         </Button>

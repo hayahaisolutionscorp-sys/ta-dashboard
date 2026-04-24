@@ -88,60 +88,97 @@ export const LooseCargoSchema = z.object({
     .min(1, "Cargo must be assigned to at least one trip"),
 });
 
-export const CreateBookingSchema = z
-  .object({
-    bookingType: z.enum(["Round Trip", "Single"]),
-    trips: z.array(TripSchema).min(1, "Select at least one trip"),
-    passengers: z.array(PassengerSchema),
-    vehicles: z.array(VehicleSchema),
-    looseCargos: z.array(LooseCargoSchema),
-    consignee: z.string().optional(),
-    contactAddress: z.string().min(1, "Contact address is required"),
-    contactMobileNumber: z.string().min(1, "Contact mobile number is required"),
-    contactEmail: z.string().email("Invalid contact email").min(1, "Contact email is required"),
-    voucherCode: z.string().optional(),
-    referralCode: z.string().optional(),
-    remarks: z.string().optional(),
-    ta_markup: z.number().nonnegative("Markup must be 0 or greater").optional(),
-    rateSnapshotId: z.number().optional(),
-    paymentMethod: z.enum(["TA-WALLET", "PAYMONGO"]).default("TA-WALLET"),
-  })
-  .refine(
-    (data) => {
-      return (
-        data.passengers.length > 0 ||
-        data.vehicles.length > 0 ||
-        data.looseCargos.length > 0
-      );
-    },
-    {
-      message:
-        "Booking must contain at least one passenger, vehicle, or cargo item",
-      path: ["passengers"],
-    },
-  )
-  .refine(
-    (data) => {
-      if (data.vehicles.length === 0) return true;
-      const passengerIndices = data.passengers.map((_, index) =>
-        index.toString(),
-      );
-      const vehiclesWithDriver = data.vehicles.filter(
-        (vehicle) =>
-          vehicle.driverId !== undefined &&
-          vehicle.driverId !== null &&
-          vehicle.driverId !== "",
-      );
-      const invalidVehicles = vehiclesWithDriver.filter(
-        (vehicle) => !passengerIndices.includes(vehicle.driverId!),
-      );
-      return invalidVehicles.length === 0;
-    },
-    {
-      message:
-        "One or more vehicles have a driver that doesn't match a valid passenger. Leave the driver field empty or select a valid passenger.",
-      path: ["vehicles"],
-    },
-  );
+/**
+ * Factory for the booking schema that bakes in route-specific markup limits.
+ *
+ * The passenger markup cap is the route's max_flat_passenger_markup. The
+ * override input on the booking form replaces only the passenger half of the
+ * markup, so that's the limit we enforce client-side. The cargo half is
+ * always derived server-side from the agent's configured values, so the UI
+ * does not need to guard it.
+ *
+ * Use the default export CreateBookingSchema for type inference / contexts
+ * where the limit is not known; call makeCreateBookingSchema({ maxPassengerMarkup })
+ * inside the booking create page after the route has loaded.
+ */
+export function makeCreateBookingSchema(
+  limits: { maxPassengerMarkup: number } = {
+    maxPassengerMarkup: Number.POSITIVE_INFINITY,
+  },
+) {
+  return z
+    .object({
+      bookingType: z.enum(["Round Trip", "Single"]),
+      trips: z.array(TripSchema).min(1, "Select at least one trip"),
+      passengers: z.array(PassengerSchema),
+      vehicles: z.array(VehicleSchema),
+      looseCargos: z.array(LooseCargoSchema),
+      consignee: z.string().optional(),
+      contactAddress: z.string().min(1, "Contact address is required"),
+      contactMobileNumber: z
+        .string()
+        .min(1, "Contact mobile number is required"),
+      contactEmail: z
+        .string()
+        .email("Invalid contact email")
+        .min(1, "Contact email is required"),
+      voucherCode: z.string().optional(),
+      referralCode: z.string().optional(),
+      remarks: z.string().optional(),
+      ta_markup: z
+        .number()
+        .nonnegative("Markup must be 0 or greater")
+        .optional(),
+      rateSnapshotId: z.number().optional(),
+      routeCode: z.string().optional(),
+      paymentMethod: z.enum(["TA-WALLET", "PAYMONGO"]).default("TA-WALLET"),
+    })
+    .refine(
+      (data) => {
+        return (
+          data.passengers.length > 0 ||
+          data.vehicles.length > 0 ||
+          data.looseCargos.length > 0
+        );
+      },
+      {
+        message:
+          "Booking must contain at least one passenger, vehicle, or cargo item",
+        path: ["passengers"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (data.vehicles.length === 0) return true;
+        const passengerIndices = data.passengers.map((_, index) =>
+          index.toString(),
+        );
+        const vehiclesWithDriver = data.vehicles.filter(
+          (vehicle) =>
+            vehicle.driverId !== undefined &&
+            vehicle.driverId !== null &&
+            vehicle.driverId !== "",
+        );
+        const invalidVehicles = vehiclesWithDriver.filter(
+          (vehicle) => !passengerIndices.includes(vehicle.driverId!),
+        );
+        return invalidVehicles.length === 0;
+      },
+      {
+        message:
+          "One or more vehicles have a driver that doesn't match a valid passenger. Leave the driver field empty or select a valid passenger.",
+        path: ["vehicles"],
+      },
+    )
+    .refine(
+      (data) => (data.ta_markup ?? 0) <= limits.maxPassengerMarkup,
+      {
+        message: "Markup exceeds the route's passenger markup limit.",
+        path: ["ta_markup"],
+      },
+    );
+}
+
+export const CreateBookingSchema = makeCreateBookingSchema();
 
 export type BookingFormData = z.infer<typeof CreateBookingSchema>;

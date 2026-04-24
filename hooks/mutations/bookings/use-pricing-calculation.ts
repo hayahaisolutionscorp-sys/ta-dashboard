@@ -37,6 +37,23 @@ export function usePricingCalculation({
     request ? JSON.stringify(request) : null,
   ];
 
+  // Every passenger trip assignment must have a cabinId — without it the
+  // pricing service cannot resolve an accommodation code and returns 400.
+  const passengersReady =
+    !!request &&
+    request.passengers.length > 0 &&
+    request.passengers.every((p) =>
+      p.tripAssignments.every(
+        (ta) => "cabinId" in ta && ta.cabinId != null,
+      ),
+    );
+
+  const hasValidItems =
+    passengersReady ||
+    (!!request &&
+      request.cargos !== undefined &&
+      request.cargos.length > 0);
+
   return useQuery<CalculatePricingResponse>({
     queryKey,
     queryFn: async () => {
@@ -50,8 +67,7 @@ export function usePricingCalculation({
       enabled &&
       !!request &&
       request.tripIds.length > 0 &&
-      (request.passengers.length > 0 ||
-        (request.cargos !== undefined && request.cargos.length > 0)),
+      hasValidItems,
     staleTime: 30 * 1000, // Cache for 30 seconds
     refetchOnWindowFocus: false,
     retry: 1,

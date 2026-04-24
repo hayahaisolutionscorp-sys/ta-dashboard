@@ -11,10 +11,19 @@ import { IconPencil, IconPencilOff } from "@tabler/icons-react";
 interface AdditionalInfoSectionProps {
   /** Default markup amount pre-filled for this TA/route (0 if none configured) */
   defaultMarkup?: number;
+  /** Max flat passenger markup the route allows (hard cap for the override input). */
+  maxPassengerMarkup?: number;
+  /** Max flat cargo markup the route allows — shown as an FYI when cargo is present. */
+  maxCargoMarkup?: number;
+  /** Whether the current booking has any cargo (vehicles or loose cargo). */
+  hasCargo?: boolean;
 }
 
 export default function AdditionalInfoSection({
   defaultMarkup = 0,
+  maxPassengerMarkup = Number.POSITIVE_INFINITY,
+  maxCargoMarkup = 0,
+  hasCargo = false,
 }: AdditionalInfoSectionProps) {
   const {
     register,
@@ -26,10 +35,19 @@ export default function AdditionalInfoSection({
   const [isOverriding, setIsOverriding] = useState(false);
   const currentMarkup = watch("ta_markup");
 
+  const limitIsFinite = Number.isFinite(maxPassengerMarkup);
+  const clampedDefault = limitIsFinite
+    ? Math.min(defaultMarkup, maxPassengerMarkup)
+    : defaultMarkup;
+  const overLimit =
+    limitIsFinite &&
+    currentMarkup !== undefined &&
+    currentMarkup !== null &&
+    currentMarkup > maxPassengerMarkup;
+
   const handleToggleOverride = () => {
     if (isOverriding) {
-      // Revert to default
-      setValue("ta_markup", defaultMarkup, { shouldValidate: true });
+      setValue("ta_markup", clampedDefault, { shouldValidate: true });
       setIsOverriding(false);
     } else {
       setIsOverriding(true);
@@ -76,6 +94,7 @@ export default function AdditionalInfoSection({
             type="number"
             step="0.01"
             min="0"
+            max={limitIsFinite ? maxPassengerMarkup : undefined}
             placeholder="0.00"
             className="h-8 text-sm w-32"
             disabled={!isOverriding}
@@ -93,8 +112,27 @@ export default function AdditionalInfoSection({
           )}
         </div>
 
-        {errors.ta_markup && (
+        {overLimit && (
+          <p className="text-xs text-red-500">
+            Markup exceeds the route&apos;s passenger limit of ₱
+            {maxPassengerMarkup.toFixed(2)}.
+          </p>
+        )}
+        {!overLimit && errors.ta_markup && (
           <p className="text-xs text-red-500">{errors.ta_markup.message}</p>
+        )}
+
+        {limitIsFinite && (
+          <p className="text-xs text-muted-foreground">
+            Max passenger markup for this route: ₱
+            {maxPassengerMarkup.toFixed(2)}.
+          </p>
+        )}
+        {hasCargo && maxCargoMarkup > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Cargo markup is auto-applied from your configured rate (up to ₱
+            {maxCargoMarkup.toFixed(2)}).
+          </p>
         )}
 
         <p className="text-xs text-muted-foreground">

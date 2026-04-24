@@ -64,7 +64,7 @@ export default function DashboardPage() {
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{currentUser?.role === "Admin" ? "Admin " : "Staff "}Dashboard</h1>
             <p className="text-muted-foreground">
               Welcome back, {currentUser?.travel_agent_name ?? "Travel Agent"}!
               Here&apos;s your overview.

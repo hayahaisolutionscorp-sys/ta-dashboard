@@ -178,9 +178,6 @@ export default function CommissionBreakdownModal({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" onClick={onBack}>
-            Back to Edit
-          </Button>
           <Button type="button" onClick={onConfirm}>
             Confirm & Create Booking
           </Button>
@@ -189,3 +186,4 @@ export default function CommissionBreakdownModal({
     </Dialog>
   );
 }
+ 

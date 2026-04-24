@@ -17,14 +17,18 @@ export function calculateCommissionAmounts(
   cargoTotal: number,
 ): CommissionAmounts {
   const passengerCommissionAmount =
-    config.passengerCommissionType === "percentage"
-      ? Math.round(((passengerTotal * config.passengerCommissionValue) / 100) * 100) / 100
-      : config.passengerCommissionValue;
+    passengerTotal > 0
+      ? config.passengerCommissionType === "percentage"
+        ? Math.round(((passengerTotal * config.passengerCommissionValue) / 100) * 100) / 100
+        : config.passengerCommissionValue
+      : 0;
 
   const cargoCommissionAmount =
-    config.cargoCommissionType === "percentage"
-      ? Math.round(((cargoTotal * config.cargoCommissionValue) / 100) * 100) / 100
-      : config.cargoCommissionValue;
+    cargoTotal > 0
+      ? config.cargoCommissionType === "percentage"
+        ? Math.round(((cargoTotal * config.cargoCommissionValue) / 100) * 100) / 100
+        : config.cargoCommissionValue
+      : 0;
 
   return {
     passengerCommissionAmount,

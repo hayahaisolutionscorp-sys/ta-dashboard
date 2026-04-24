@@ -322,7 +322,7 @@ export default function BookingConfirm({
           Back to Edit
         </Button>
         <Button type="button" onClick={onConfirm} disabled={isPending}>
-          {isPending ? "Creating Booking..." : "Confirm & Create Booking"}
+          {isPending ? "Creating Booking..." : "Finalize Booking"}
         </Button>
       </div>
     </div>

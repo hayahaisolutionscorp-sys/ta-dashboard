@@ -79,8 +79,12 @@ export interface TripView {
 export interface CabinView {
   id: number;
   name: string;
+  code?: string | null;
   capacity?: number;
   available?: number;
+  remaining_capacity?: number | null;
+  cabin_type_id?: number | null;
+  cabin_type_name?: string | null;
 }
 
 // ==================== Client API Trip Summary (from /bookings/prepare) ====================
@@ -88,7 +92,11 @@ export interface CabinView {
 export interface CabinSummary {
   id: number;
   name: string;
+  code?: string | null;
   capacity: number;
+  remaining_capacity?: number | null;
+  cabin_type_id?: number | null;
+  cabin_type_name?: string | null;
 }
 
 export interface ShipSummary {
@@ -105,6 +113,8 @@ export interface TripSummary {
   origin: string;
   destination: string;
   route_code: string;
+  rate_snapshot_id?: string | null;
+  cabinPrices?: Record<string, string>;
   ship: ShipSummary | null;
 }
 

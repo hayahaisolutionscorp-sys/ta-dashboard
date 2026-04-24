@@ -17,7 +17,7 @@ interface TripInfo {
   tripId?: string;
   tripType: "departure" | "return";
   sequence: number;
-  cabins?: Array<{ id: number; name: string }>;
+  cabins?: Array<{ id: number; name: string; code?: string | null; cabin_type_name?: string | null }>;
 }
 
 interface TripAssignment {
@@ -182,13 +182,8 @@ export default function PassengersSection({
               const trip = trips[tripIdx];
               if (!trip) return null;
 
-              const uniqueCabins = trip.cabins
-                ? Array.from(
-                    new Map(
-                      trip.cabins.map((c) => [c.name.toUpperCase(), c]),
-                    ).values(),
-                  )
-                : [];
+              // Each cabin is a distinct entity (not a cabin type) — no deduplication needed
+              const uniqueCabins = trip.cabins ?? [];
 
               if (uniqueCabins.length <= 1) return null;
 
@@ -216,7 +211,7 @@ export default function PassengersSection({
                       updated[tripIdx] = {
                         ...updated[tripIdx],
                         cabinId: Number(val),
-                        cabin_type_name: selectedCabin?.name,
+                        cabin_type_name: selectedCabin?.cabin_type_name ?? selectedCabin?.name,
                       };
                       onUpdate(index, "tripAssignments", updated);
                     }}

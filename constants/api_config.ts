@@ -7,8 +7,8 @@ export const ROUTES_API = {
     `/routes/tenants?${ids.map((id) => `ids=${id}`).join("&")}`,
 };
 export const TRIPS_API = {
-  TRIP: "/public/trips",
-  AVAILABLE: "/public/trips/available-dates",
+  TRIP: "/travel-agencies-booking/trips",
+  AVAILABLE: "/travel-agencies-booking/trips/available-dates",
 };
 export const TRAVEL_AGENCY_API = {
   AUTH: {

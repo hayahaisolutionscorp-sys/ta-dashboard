@@ -557,8 +557,12 @@ export default function BookingDetailPage() {
                     Number(booking.ta_passenger_commission ?? 0) +
                     Number(booking.ta_cargo_commission ?? 0);
                   const markup = Number(booking.ta_markup ?? 0);
-                  const base = Number(booking.price_without_markup ?? booking.total_price ?? 0);
-                  const netPrice = base - commission;
+                  // total_price = customer-facing total (incl. markup, net of commission).
+                  // TA's actual cost = total_price − markup.
+                  const totalPrice = Number(
+                    booking.total_price ?? booking.price_without_markup ?? 0,
+                  );
+                  const netPrice = totalPrice - markup;
                   return (
                     <>
                       <p className="text-lg font-bold text-green-600">

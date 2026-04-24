@@ -126,12 +126,24 @@ export default function TripSummaryPanel({
 
     if (!hasItems) return null;
 
+    // Block pricing when any passenger has no cabinId — the pricing service
+    // requires either a cabinId (resolved to cabin.code) or a direct accommodationCode.
+    // When cabins array is empty (rate/cabin data mismatch) or the user hasn't
+    // selected a cabin yet, sending the request would produce a 400.
+    if ((formData.passengers?.length ?? 0) > 0) {
+      const allPassengersHaveCabin = (formData.passengers ?? []).every((pax) =>
+        (pax.tripAssignments ?? []).every((ta) => ta.cabinId != null),
+      );
+      if (!allPassengersHaveCabin) return null;
+    }
+
     const passengers = (formData.passengers ?? []).map((pax, idx) => ({
       index: idx,
       passengerType: pax.tripAssignments?.at(0)?.discountType ?? "Adult",
       tripAssignments: (pax.tripAssignments ?? []).map((ta) => ({
         tripId: ta.tripId,
-        cabinId: ta.cabinId,
+        // Omit cabinId entirely when null — sending null causes a 400 from the pricing service
+        ...(ta.cabinId != null ? { cabinId: ta.cabinId } : {}),
         discountType: ta.discountType,
       })),
     }));

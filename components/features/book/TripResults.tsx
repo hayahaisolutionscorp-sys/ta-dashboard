@@ -86,7 +86,7 @@ export default function TripResults({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2 sm:space-y-3">
-        {trips.map((trip) => {
+        {trips.map((trip, idx) => {
           const isSelected = selectedTripIds.includes(trip.id);
           const firstSegment = trip.segments?.[0];
           const shipName = firstSegment?.ship_name ?? "Ship TBD";
@@ -119,7 +119,7 @@ export default function TripResults({
           return (
             <button
               type="button"
-              key={trip.id}
+              key={trip.id ?? idx}
               onClick={() => onTripSelect(trip.id)}
               className={`w-full p-3 sm:p-4 border rounded-lg transition-all cursor-pointer text-left ${
                 isSelected
