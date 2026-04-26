@@ -13,7 +13,7 @@ class ReportService {
   async getAgencyReportData(
     params: ReportDataParams,
   ): Promise<AgencyPerformanceData> {
-    const query = new URLSearchParams(params).toString();
+    const query = new URLSearchParams(params as unknown as Record<string, string>).toString();
     const { data } = await api.get(
       `${TRAVEL_AGENCY_API.REPORTS.AGENCY_PERFORMANCE_DATA}?${query}`,
     );
@@ -23,7 +23,7 @@ class ReportService {
   async getStaffReportData(
     params: ReportDataParams,
   ): Promise<StaffPerformanceData> {
-    const query = new URLSearchParams(params).toString();
+    const query = new URLSearchParams(params as unknown as Record<string, string>).toString();
     const { data } = await api.get(
       `${TRAVEL_AGENCY_API.REPORTS.STAFF_PERFORMANCE_DATA}?${query}`,
     );
@@ -33,27 +33,26 @@ class ReportService {
   // ── File download endpoints ─────────────────────────────
 
   async downloadAgencyReport(params: GenerateReportParams): Promise<void> {
-    const query = new URLSearchParams(params).toString();
+    const query = new URLSearchParams(params as unknown as Record<string, string>).toString();
     const response = await api.get(
       `${TRAVEL_AGENCY_API.REPORTS.AGENCY_PERFORMANCE}?${query}`,
       { responseType: "blob" },
     );
-    this.downloadBlob(response.data, response.headers);
+    this.downloadBlob(response.data, String(response.headers["content-disposition"] ?? ""));
   }
 
   async downloadStaffReport(params: GenerateReportParams): Promise<void> {
-    const query = new URLSearchParams(params).toString();
+    const query = new URLSearchParams(params as unknown as Record<string, string>).toString();
     const response = await api.get(
       `${TRAVEL_AGENCY_API.REPORTS.STAFF_PERFORMANCE}?${query}`,
       { responseType: "blob" },
     );
-    this.downloadBlob(response.data, response.headers);
+    this.downloadBlob(response.data, String(response.headers["content-disposition"] ?? ""));
   }
 
-  // ── Helpers ─────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────
 
-  private downloadBlob(blob: Blob, headers: Record<string, string>) {
-    const disposition = headers["content-disposition"] || "";
+  private downloadBlob(blob: Blob, disposition: string) {
     const filenameMatch = disposition.match(/filename="(.+?)"/);
     const filename = filenameMatch?.[1] ?? "report";
 
