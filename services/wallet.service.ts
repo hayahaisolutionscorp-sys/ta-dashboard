@@ -178,10 +178,12 @@ class WalletService {
   }
 
   async getEnabledProviders(): Promise<PaymentProvider[]> {
-    const response = await api.get<PaymentProvider[]>(
+    const response = await api.get<{ status: string; data: PaymentProvider[] } | PaymentProvider[]>(
       TRAVEL_AGENCY_API.PAYMENT_PROVIDERS.ENABLED,
     );
-    return response.data;
+    // Unwrap { status, data } envelope if present
+    const raw = response.data;
+    return Array.isArray(raw) ? raw : (raw as { data: PaymentProvider[] }).data ?? [];
   }
 
   async getDepositMethods(): Promise<DepositMethodConfig[]> {

@@ -93,8 +93,8 @@ export const TRAVEL_AGENCY_API = {
     MAYA_CHECKOUT: "/v2/payments/maya/checkout",
   },
   PAYMENT_PROVIDERS: {
-    ENABLED: "/payments/providers/enabled",
-    DEPOSIT_METHODS: "/payments/providers/deposit-methods",
+    ENABLED: "/v2/payments/providers/enabled",
+    DEPOSIT_METHODS: "/v2/payments/providers/deposit-methods",
   },
   REPORTS: {
     AGENCY_PERFORMANCE: "/travel-agency-reports/agency-performance",

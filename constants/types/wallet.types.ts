@@ -107,6 +107,14 @@ export interface WithdrawalRequestPayload {
 }
 
 // ==================== Payment Provider ====================
+export interface EnabledPaymentMethod {
+  id: string;
+  code: string;
+  name: string;
+  is_enabled: boolean;
+  payment_provider_id: number;
+}
+
 export interface PaymentProvider {
   id: number;
   code: string;
@@ -114,10 +122,11 @@ export interface PaymentProvider {
   is_enabled: boolean;
   created_at: string;
   updated_at: string;
+  methods: EnabledPaymentMethod[];
 }
 
 export interface DepositMethodConfig {
-  code: "gcash" | "paymaya" | "grabpay" | "qrph" | "cards" | "bank_transfer";
+  code: "gcash" | "paymaya" | "grabpay" | "qrph" | "cards" | "bank_transfer" | "cash" | "gcash_manual";
   name: string;
   kind: "instant" | "manual";
   min_amount: number;
